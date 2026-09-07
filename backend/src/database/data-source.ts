@@ -9,6 +9,8 @@ import { Facility } from '../modules/facilities/entities/facility.entity';
 import { FacilityAvailability } from '../modules/facilities/entities/facility-availability.entity';
 import { FacilityPricing } from '../modules/facilities/entities/facility-pricing.entity';
 import { FacilityRequirement } from '../modules/facilities/entities/facility-requirement.entity';
+import { Inquiry } from '../modules/inquiries/entities/inquiry.entity';
+import { InquiryMessage } from '../modules/inquiries/entities/inquiry-message.entity';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
@@ -28,6 +30,8 @@ const AppDataSource = new DataSource({
     FacilityAvailability,
     FacilityPricing,
     FacilityRequirement,
+    Inquiry,
+    InquiryMessage,
   ],
 
   migrations: [

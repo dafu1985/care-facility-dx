@@ -1,10 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { Facility } from './entities/facility.entity';
 import { FacilitySearchDto } from './dto/facility-search.dto';
-import { FacilityListResponseDto } from './dto/facility-response.dto';
+import {
+  FacilityListResponseDto,
+  FacilityResponseDto,
+} from './dto/facility-response.dto';
 import { FacilityMapper } from './facility.mapper';
 
 @Injectable()
@@ -165,5 +171,43 @@ export class FacilitiesService {
       pageSize,
       total,
     };
+  }
+
+  async findOne(
+    facilityId: string,
+  ): Promise<FacilityResponseDto> {
+    const facility = await this.facilityRepository
+      .createQueryBuilder('facility')
+      .leftJoinAndSelect(
+        'facility.facilityType',
+        'facilityType',
+      )
+      .leftJoinAndSelect(
+        'facility.availability',
+        'availability',
+      )
+      .leftJoinAndSelect(
+        'facility.pricing',
+        'pricing',
+      )
+      .leftJoinAndSelect(
+        'facility.requirement',
+        'requirement',
+      )
+      .where(
+        'facility.facilityId = :facilityId',
+        {
+          facilityId,
+        },
+      )
+      .getOne();
+
+    if (!facility) {
+      throw new NotFoundException(
+        'Facility not found',
+      );
+    }
+
+    return FacilityMapper.toResponse(facility);
   }
 }
