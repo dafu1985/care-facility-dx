@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import type { FindOneOptions, Repository } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
@@ -15,6 +19,7 @@ import {
   FacilityStaffStatus,
 } from './entities/facility-staff.entity';
 import { Facility } from './entities/facility.entity';
+import { FacilityRequirement } from './entities/facility-requirement.entity';
 
 import { FacilitiesService } from './facilities.service';
 
@@ -63,6 +68,25 @@ describe('FacilitiesService updateAvailability', () => {
           options: FindOneOptions<FacilityStaff>,
         ) => Promise<FacilityStaff | null>
       >(),
+  };
+
+  /**
+   * FacilityRequirement Repository モック。
+   */
+  const facilityRequirementRepository = {
+    findOne:
+      jest.fn<
+        (
+          options: FindOneOptions<FacilityRequirement>,
+        ) => Promise<FacilityRequirement | null>
+      >(),
+
+    create:
+      jest.fn<(input: Partial<FacilityRequirement>) => FacilityRequirement>(),
+
+    save: jest.fn<
+      (requirement: FacilityRequirement) => Promise<FacilityRequirement>
+    >(),
   };
 
   /**
@@ -132,6 +156,25 @@ describe('FacilitiesService updateAvailability', () => {
 
       facility: undefined,
     }) as unknown as FacilityAvailability;
+
+  /**
+   * テスト用受入条件を生成する。
+   */
+  const createRequirement = (): FacilityRequirement =>
+    ({
+      requirementId: '05141f9c-4613-4447-86f3-3226b55abc23',
+      facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+      minCareLevel: 1,
+      maxCareLevel: 5,
+      dementiaAccepted: true,
+      medicalCareAccepted: true,
+      wheelchairAccepted: true,
+      endOfLifeCare: false,
+      note: '認知症・医療ケア対応可能。詳細は事前相談。',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      facility: undefined,
+    }) as unknown as FacilityRequirement;
 
   /**
    * テスト用FacilityStaffを生成する。
@@ -208,10 +251,18 @@ describe('FacilitiesService updateAvailability', () => {
     const staffRepo =
       facilityStaffRepository as unknown as Repository<FacilityStaff>;
 
+    const requirementRepo =
+      facilityRequirementRepository as unknown as Repository<FacilityRequirement>;
+
     /**
-     * FacilitiesServiceのconstructorは3引数。
+     * FacilitiesServiceのconstructorは4引数。
      */
-    service = new FacilitiesService(facilityRepo, availabilityRepo, staffRepo);
+    service = new FacilitiesService(
+      facilityRepo,
+      availabilityRepo,
+      staffRepo,
+      requirementRepo,
+    );
   });
 
   it('FACILITYは自施設の空き状況を更新できる', async () => {
@@ -491,5 +542,217 @@ describe('FacilitiesService updateAvailability', () => {
         note: '元のメモ',
       }),
     );
+  });
+
+  describe('updateRequirement', () => {
+    it('FACILITYは自施設の受入条件を更新できる', async () => {
+      const facility = createFacility();
+      const requirement = createRequirement();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityStaffRepository.findOne.mockResolvedValue(
+        createFacilityStaff(facility.facilityId, facilityUser.userId),
+      );
+      facilityRequirementRepository.findOne.mockResolvedValue(requirement);
+
+      const savedRequirement: FacilityRequirement = {
+        ...requirement,
+        minCareLevel: 2,
+        maxCareLevel: 5,
+        note: '要介護2以上を受け入れ可能。',
+      };
+
+      facilityRequirementRepository.save.mockResolvedValue(savedRequirement);
+
+      const result = await service.updateRequirement(
+        facility.facilityId,
+        {
+          minCareLevel: 2,
+          maxCareLevel: 5,
+          note: '要介護2以上を受け入れ可能。',
+        },
+        facilityUser,
+      );
+
+      expect(result.minCareLevel).toBe(2);
+      expect(result.maxCareLevel).toBe(5);
+
+      expect(facilityStaffRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          userId: facilityUser.userId,
+          facilityId: facility.facilityId,
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
+
+      expect(facilityRequirementRepository.save).toHaveBeenCalled();
+    });
+
+    it('FACILITYは他施設の受入条件を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityStaffRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateRequirement(
+          facility.facilityId,
+          { dementiaAccepted: true },
+          facilityUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(facilityRequirementRepository.findOne).not.toHaveBeenCalled();
+      expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('ADMINは任意施設の受入条件を更新できる', async () => {
+      const facility = createFacility();
+      const requirement = createRequirement();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityRequirementRepository.findOne.mockResolvedValue(requirement);
+
+      const savedRequirement: FacilityRequirement = {
+        ...requirement,
+        medicalCareAccepted: false,
+      };
+
+      facilityRequirementRepository.save.mockResolvedValue(savedRequirement);
+
+      const result = await service.updateRequirement(
+        facility.facilityId,
+        { medicalCareAccepted: false },
+        adminUser,
+      );
+
+      expect(result.medicalCareAccepted).toBe(false);
+      expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      expect(facilityRequirementRepository.save).toHaveBeenCalled();
+    });
+
+    it('CARE_MANAGERは受入条件を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      await expect(
+        service.updateRequirement(
+          facility.facilityId,
+          { dementiaAccepted: true },
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(facilityRequirementRepository.findOne).not.toHaveBeenCalled();
+      expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('存在しない施設の受入条件更新は404になる', async () => {
+      facilityRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateRequirement(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          { dementiaAccepted: true },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(facilityRequirementRepository.findOne).not.toHaveBeenCalled();
+      expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('受入条件が未作成の場合は新規作成する', async () => {
+      const facility = createFacility();
+      const newRequirement = createRequirement();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityRequirementRepository.findOne.mockResolvedValue(null);
+      facilityRequirementRepository.create.mockReturnValue(newRequirement);
+      facilityRequirementRepository.save.mockResolvedValue(newRequirement);
+
+      const result = await service.updateRequirement(
+        facility.facilityId,
+        {
+          minCareLevel: 1,
+          maxCareLevel: 5,
+          dementiaAccepted: true,
+          medicalCareAccepted: true,
+          wheelchairAccepted: true,
+          endOfLifeCare: false,
+          note: '新規受入条件',
+        },
+        adminUser,
+      );
+
+      expect(facilityRequirementRepository.create).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+      });
+      expect(result.facilityId).toBe(facility.facilityId);
+      expect(facilityRequirementRepository.save).toHaveBeenCalled();
+    });
+
+    it('PATCHでは指定された受入条件だけ更新する', async () => {
+      const facility = createFacility();
+      const originalRequirement = createRequirement();
+
+      originalRequirement.note = '元のメモ';
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityRequirementRepository.findOne.mockResolvedValue(
+        originalRequirement,
+      );
+      facilityRequirementRepository.save.mockImplementation(
+        async (target: FacilityRequirement) => target,
+      );
+
+      const result = await service.updateRequirement(
+        facility.facilityId,
+        { note: '更新後のメモ' },
+        adminUser,
+      );
+
+      expect(result.note).toBe('更新後のメモ');
+      expect(result.minCareLevel).toBe(1);
+      expect(result.maxCareLevel).toBe(5);
+      expect(result.dementiaAccepted).toBe(true);
+      expect(result.medicalCareAccepted).toBe(true);
+      expect(result.wheelchairAccepted).toBe(true);
+      expect(result.endOfLifeCare).toBe(false);
+
+      expect(facilityRequirementRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minCareLevel: 1,
+          maxCareLevel: 5,
+          dementiaAccepted: true,
+          medicalCareAccepted: true,
+          wheelchairAccepted: true,
+          endOfLifeCare: false,
+          note: '更新後のメモ',
+        }),
+      );
+    });
+
+    it('minCareLevelがmaxCareLevelを上回る場合は400になる', async () => {
+      const facility = createFacility();
+      const requirement = createRequirement();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+      facilityRequirementRepository.findOne.mockResolvedValue(requirement);
+
+      await expect(
+        service.updateRequirement(
+          facility.facilityId,
+          {
+            minCareLevel: 4,
+            maxCareLevel: 2,
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
   });
 });

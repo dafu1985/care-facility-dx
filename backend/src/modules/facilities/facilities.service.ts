@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -9,20 +10,23 @@ import { Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
 
-import { Facility } from './entities/facility.entity';
-import { FacilityAvailability } from './entities/facility-availability.entity';
-import {
-  FacilityStaff,
-  FacilityStaffStatus,
-} from './entities/facility-staff.entity';
-
-import { FacilitySearchDto } from './dto/facility-search.dto';
+import { FacilityAvailabilityResponseDto } from './dto/facility-availability-response.dto';
+import { FacilityRequirementResponseDto } from './dto/facility-requirement-response.dto';
 import {
   FacilityListResponseDto,
   FacilityResponseDto,
 } from './dto/facility-response.dto';
+import { FacilitySearchDto } from './dto/facility-search.dto';
 import { UpdateFacilityAvailabilityDto } from './dto/update-facility-availability.dto';
-import { FacilityAvailabilityResponseDto } from './dto/facility-availability-response.dto';
+import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
+
+import { FacilityAvailability } from './entities/facility-availability.entity';
+import { FacilityRequirement } from './entities/facility-requirement.entity';
+import {
+  FacilityStaff,
+  FacilityStaffStatus,
+} from './entities/facility-staff.entity';
+import { Facility } from './entities/facility.entity';
 
 import { FacilityMapper } from './facility.mapper';
 
@@ -37,6 +41,9 @@ export class FacilitiesService {
 
     @InjectRepository(FacilityStaff)
     private readonly facilityStaffRepository: Repository<FacilityStaff>,
+
+    @InjectRepository(FacilityRequirement)
+    private readonly facilityRequirementRepository: Repository<FacilityRequirement>,
   ) {}
 
   /**
@@ -158,8 +165,11 @@ export class FacilitiesService {
 
     return {
       items: FacilityMapper.toResponseList(facilities),
+
       page,
+
       pageSize,
+
       total,
     };
   }
@@ -204,7 +214,7 @@ export class FacilitiesService {
     user: AuthenticatedUser,
   ): Promise<FacilityAvailabilityResponseDto> {
     /**
-     * 施設自体の存在確認。
+     * 施設存在確認。
      */
     const facility = await this.facilityRepository.findOne({
       where: {
@@ -217,34 +227,9 @@ export class FacilitiesService {
     }
 
     /**
-     * FACILITYユーザーの場合、
-     * facility_staffで所属確認を行う。
+     * 更新権限確認。
      */
-    if (user.role === UserRole.FACILITY) {
-      const facilityStaff = await this.facilityStaffRepository.findOne({
-        where: {
-          userId: user.userId,
-
-          facilityId,
-
-          status: FacilityStaffStatus.ACTIVE,
-        },
-      });
-
-      if (!facilityStaff) {
-        throw new ForbiddenException(
-          'You do not have permission to update this facility',
-        );
-      }
-    } else if (user.role !== UserRole.ADMIN) {
-      /**
-       * CARE_MANAGERなど、
-       * FACILITY / ADMIN以外は禁止。
-       */
-      throw new ForbiddenException(
-        'You are not allowed to update facility availability',
-      );
-    }
+    await this.assertFacilityUpdateAccess(facilityId, user, 'availability');
 
     /**
      * 現在の空き状況を取得。
@@ -256,8 +241,7 @@ export class FacilitiesService {
     });
 
     /**
-     * 空き状況レコードが未作成の場合は
-     * 新規作成する。
+     * 未作成の場合は新規作成。
      */
     if (!availability) {
       availability = this.facilityAvailabilityRepository.create({
@@ -266,8 +250,8 @@ export class FacilitiesService {
     }
 
     /**
-     * PATCHなので、
-     * リクエストに含まれている項目だけ更新する。
+     * PATCHのため、
+     * 指定された項目だけ更新する。
      */
     if (dto.status !== undefined) {
       availability.status = dto.status;
@@ -285,9 +269,6 @@ export class FacilitiesService {
       availability.note = dto.note;
     }
 
-    /**
-     * 保存。
-     */
     const saved = await this.facilityAvailabilityRepository.save(availability);
 
     return {
@@ -305,5 +286,194 @@ export class FacilitiesService {
 
       updatedAt: saved.updatedAt,
     };
+  }
+
+  /**
+   * 施設の受入条件を更新する。
+   *
+   * FACILITY:
+   * ACTIVE状態で所属している自施設のみ更新可能。
+   *
+   * ADMIN:
+   * 全施設更新可能。
+   *
+   * CARE_MANAGER:
+   * 更新不可。
+   */
+  async updateRequirement(
+    facilityId: string,
+    dto: UpdateFacilityRequirementDto,
+    user: AuthenticatedUser,
+  ): Promise<FacilityRequirementResponseDto> {
+    /**
+     * 施設存在確認。
+     */
+    const facility = await this.facilityRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    /**
+     * 更新権限確認。
+     */
+    await this.assertFacilityUpdateAccess(facilityId, user, 'requirement');
+
+    /**
+     * 現在の受入条件を取得。
+     */
+    let requirement = await this.facilityRequirementRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    /**
+     * 未作成なら新規作成。
+     */
+    if (!requirement) {
+      requirement = this.facilityRequirementRepository.create({
+        facilityId,
+      });
+    }
+
+    /**
+     * PATCHのため、
+     * 指定された項目だけ更新する。
+     */
+    if (dto.minCareLevel !== undefined) {
+      requirement.minCareLevel = dto.minCareLevel;
+    }
+
+    if (dto.maxCareLevel !== undefined) {
+      requirement.maxCareLevel = dto.maxCareLevel;
+    }
+
+    if (dto.dementiaAccepted !== undefined) {
+      requirement.dementiaAccepted = dto.dementiaAccepted;
+    }
+
+    if (dto.medicalCareAccepted !== undefined) {
+      requirement.medicalCareAccepted = dto.medicalCareAccepted;
+    }
+
+    if (dto.wheelchairAccepted !== undefined) {
+      requirement.wheelchairAccepted = dto.wheelchairAccepted;
+    }
+
+    if (dto.endOfLifeCare !== undefined) {
+      requirement.endOfLifeCare = dto.endOfLifeCare;
+    }
+
+    if (dto.note !== undefined) {
+      requirement.note = dto.note;
+    }
+
+    /**
+     * 業務ルール:
+     *
+     * 最低要介護度が最高要介護度を
+     * 上回る状態は禁止する。
+     */
+    if (
+      requirement.minCareLevel !== null &&
+      requirement.minCareLevel !== undefined &&
+      requirement.maxCareLevel !== null &&
+      requirement.maxCareLevel !== undefined &&
+      requirement.minCareLevel > requirement.maxCareLevel
+    ) {
+      throw new BadRequestException(
+        'minCareLevel must be less than or equal to maxCareLevel',
+      );
+    }
+
+    const saved = await this.facilityRequirementRepository.save(requirement);
+
+    return {
+      requirementId: saved.requirementId,
+
+      facilityId: saved.facilityId,
+
+      minCareLevel: saved.minCareLevel,
+
+      maxCareLevel: saved.maxCareLevel,
+
+      dementiaAccepted: saved.dementiaAccepted,
+
+      medicalCareAccepted: saved.medicalCareAccepted,
+
+      wheelchairAccepted: saved.wheelchairAccepted,
+
+      endOfLifeCare: saved.endOfLifeCare,
+
+      note: saved.note,
+
+      updatedAt: saved.updatedAt,
+    };
+  }
+
+  /**
+   * 施設更新系API共通の認可処理。
+   *
+   * FACILITY:
+   * ACTIVE状態で対象施設へ所属している場合のみ許可。
+   *
+   * ADMIN:
+   * 全施設を更新可能。
+   *
+   * その他:
+   * 更新不可。
+   */
+  private async assertFacilityUpdateAccess(
+    facilityId: string,
+    user: AuthenticatedUser,
+    resource: 'availability' | 'requirement',
+  ): Promise<void> {
+    /**
+     * ADMINは所属確認不要。
+     */
+    if (user.role === UserRole.ADMIN) {
+      return;
+    }
+
+    /**
+     * FACILITYは所属施設を確認。
+     */
+    if (user.role === UserRole.FACILITY) {
+      const facilityStaff = await this.facilityStaffRepository.findOne({
+        where: {
+          userId: user.userId,
+
+          facilityId,
+
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
+
+      if (!facilityStaff) {
+        throw new ForbiddenException(
+          'You do not have permission to update this facility',
+        );
+      }
+
+      return;
+    }
+
+    /**
+     * CARE_MANAGERなどは更新不可。
+     */
+    if (resource === 'availability') {
+      throw new ForbiddenException(
+        'You are not allowed to update facility availability',
+      );
+    }
+
+    throw new ForbiddenException(
+      'You are not allowed to update facility requirements',
+    );
   }
 }

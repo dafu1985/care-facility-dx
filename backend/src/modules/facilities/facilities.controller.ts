@@ -22,19 +22,22 @@ import {
 
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
 
 import { FacilitiesService } from './facilities.service';
-import { FacilitySearchDto } from './dto/facility-search.dto';
+
+import { FacilityAvailabilityResponseDto } from './dto/facility-availability-response.dto';
+import { FacilityRequirementResponseDto } from './dto/facility-requirement-response.dto';
 import {
   FacilityListResponseDto,
   FacilityResponseDto,
 } from './dto/facility-response.dto';
+import { FacilitySearchDto } from './dto/facility-search.dto';
 import { UpdateFacilityAvailabilityDto } from './dto/update-facility-availability.dto';
-import { FacilityAvailabilityResponseDto } from './dto/facility-availability-response.dto';
+import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
 
 @ApiTags('facilities')
 @Controller('facilities')
@@ -152,5 +155,59 @@ export class FacilitiesController {
     user: AuthenticatedUser,
   ): Promise<FacilityAvailabilityResponseDto> {
     return this.facilitiesService.updateAvailability(facilityId, dto, user);
+  }
+
+  /**
+   * 施設の受入条件更新。
+   *
+   * FACILITY:
+   * 自分がACTIVE状態で所属している施設のみ更新可能。
+   *
+   * ADMIN:
+   * 全施設更新可能。
+   *
+   * CARE_MANAGER:
+   * RolesGuardで拒否。
+   */
+  @Patch(':facilityId/requirement')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FACILITY, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '介護施設の受入条件を更新する',
+    description: '施設職員は自施設、管理者は任意施設の受入条件を更新します。',
+  })
+  @ApiParam({
+    name: 'facilityId',
+    description: '施設ID',
+    example: '5ea06a45-7587-4198-b94c-56e0044399c7',
+  })
+  @ApiOkResponse({
+    description: '受入条件の更新に成功',
+    type: FacilityRequirementResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '施設ID、入力値、または要介護度の範囲が不正',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'JWTが未指定または不正',
+  })
+  @ApiForbiddenResponse({
+    description: 'この施設の受入条件を更新する権限がない',
+  })
+  @ApiNotFoundResponse({
+    description: '指定された施設が存在しない',
+  })
+  async updateRequirement(
+    @Param('facilityId', new ParseUUIDPipe())
+    facilityId: string,
+
+    @Body()
+    dto: UpdateFacilityRequirementDto,
+
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ): Promise<FacilityRequirementResponseDto> {
+    return this.facilitiesService.updateRequirement(facilityId, dto, user);
   }
 }
