@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import {
   DataSource,
   EntityManager,
@@ -368,6 +368,24 @@ describe('InquiriesService authorization', () => {
     });
   });
 
+  describe('findOne not found', () => {
+    it('存在しない問い合わせは404になる', async () => {
+      // QueryBuilderから問い合わせが取得できない状態を再現
+      mockFindOneQueryBuilder(null);
+
+      await expect(
+        service.findOne(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      // 問い合わせ自体が存在しないため、
+      // 施設所属確認まで進まない
+      expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findAll authorization', () => {
     it('CARE_MANAGERは自分の問い合わせだけに絞り込む', async () => {
       const queryBuilder = mockFindAllQueryBuilder([ownInquiry], 1);
@@ -597,6 +615,58 @@ describe('InquiriesService authorization', () => {
 
       expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
     });
+
+    it('存在しない問い合わせへの返信は404になる', async () => {
+      // transaction内のfindOneで
+      // 問い合わせが見つからない状態を再現
+      inquiryRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.addMessage(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          createMessageDto,
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      // 問い合わせが存在しないため、
+      // メッセージ作成・保存は実行されない
+      expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+
+      expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+
+      // Inquiryの更新もされない
+      expect(inquiryRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('メッセージ追加成功時にlastMessageAtが保存メッセージ日時へ更新される', async () => {
+      const savedMessage = setupAddMessageSuccess(careManagerUser.userId);
+
+      await service.addMessage(
+        ownInquiry.inquiryId,
+        createMessageDto,
+        careManagerUser,
+      );
+
+      expect(ownInquiry.lastMessageAt).toEqual(savedMessage.createdAt);
+    });
+
+    it('メッセージ追加成功時に更新済みInquiryが保存される', async () => {
+      const savedMessage = setupAddMessageSuccess(careManagerUser.userId);
+
+      await service.addMessage(
+        ownInquiry.inquiryId,
+        createMessageDto,
+        careManagerUser,
+      );
+
+      expect(inquiryRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inquiryId: ownInquiry.inquiryId,
+          lastMessageAt: savedMessage.createdAt,
+        }),
+      );
+    });
   });
 
   describe('updateStatus authorization', () => {
@@ -694,6 +764,92 @@ describe('InquiriesService authorization', () => {
       expect(result.status).toBe(InquiryStatus.ANSWERED);
 
       expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('存在しない問い合わせのステータス更新は404になる', async () => {
+      // transaction内で問い合わせが
+      // 見つからない状態を再現
+      inquiryRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateStatus(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          updateStatusDto,
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      // 問い合わせが存在しないため、
+      // ステータス変更履歴は生成されない
+      expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+
+      expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+
+      // Inquiry自体も更新されない
+      expect(inquiryRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('ステータス更新成功時にSTATUS_CHANGE本文へ変更前後のステータスが記録される', async () => {
+      const inquiryBeforeUpdate: Inquiry = {
+        ...ownInquiry,
+        status: InquiryStatus.OPEN,
+      };
+
+      inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
+      inquiryRepository.save.mockImplementation(
+        async (inquiry: Inquiry) => inquiry,
+      );
+
+      const statusMessage: InquiryMessage = {
+        messageId: '44444444-4444-4444-8444-444444444444',
+        inquiryId: inquiryBeforeUpdate.inquiryId,
+        senderUserId: null,
+        type: InquiryMessageType.STATUS_CHANGE,
+        body: 'Status changed from OPEN to ANSWERED',
+        createdAt: new Date(),
+        inquiry: undefined as never,
+        senderUser: null,
+      };
+
+      inquiryMessageRepository.create.mockReturnValue(statusMessage);
+      inquiryMessageRepository.save.mockResolvedValue(statusMessage);
+
+      mockFindOneQueryBuilder({
+        ...inquiryBeforeUpdate,
+        status: InquiryStatus.ANSWERED,
+      });
+
+      await service.updateStatus(
+        inquiryBeforeUpdate.inquiryId,
+        updateStatusDto,
+        adminUser,
+      );
+
+      expect(inquiryMessageRepository.create).toHaveBeenCalledWith({
+        inquiryId: inquiryBeforeUpdate.inquiryId,
+        senderUserId: null,
+        type: InquiryMessageType.STATUS_CHANGE,
+        body: 'Status changed from OPEN to ANSWERED',
+      });
+    });
+
+    it('ステータス更新成功時にlastMessageAtがSTATUS_CHANGEメッセージ日時へ更新される', async () => {
+      const statusMessage = setupUpdateStatusSuccess();
+
+      await service.updateStatus(
+        ownInquiry.inquiryId,
+        updateStatusDto,
+        adminUser,
+      );
+
+      expect(ownInquiry.lastMessageAt).toEqual(statusMessage.createdAt);
+
+      expect(inquiryRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inquiryId: ownInquiry.inquiryId,
+          lastMessageAt: statusMessage.createdAt,
+        }),
+      );
     });
   });
 });
