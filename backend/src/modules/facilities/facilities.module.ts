@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuthModule } from '../auth/auth.module';
+
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
 
@@ -13,6 +15,15 @@ import { FacilityType } from './entities/facility-type.entity';
 
 @Module({
   imports: [
+    /**
+     * JwtAuthGuardなど認証系Providerを
+     * FacilitiesModuleで利用するためにimportする。
+     */
+    AuthModule,
+
+    /**
+     * FacilitiesServiceで使用するRepository。
+     */
     TypeOrmModule.forFeature([
       FacilityType,
       Facility,
@@ -22,14 +33,11 @@ import { FacilityType } from './entities/facility-type.entity';
       FacilityStaff,
     ]),
   ],
-  controllers: [
-    FacilitiesController,
-  ],
-  providers: [
-    FacilitiesService,
-  ],
-  exports: [
-    TypeOrmModule,
-  ],
+
+  controllers: [FacilitiesController],
+
+  providers: [FacilitiesService],
+
+  exports: [TypeOrmModule],
 })
 export class FacilitiesModule {}

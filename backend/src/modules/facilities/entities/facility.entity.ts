@@ -9,6 +9,8 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+import type { Relation } from 'typeorm';
+
 import { FacilityType } from './facility-type.entity';
 import { FacilityAvailability } from './facility-availability.entity';
 import { FacilityPricing } from './facility-pricing.entity';
@@ -98,23 +100,14 @@ export class Facility {
     name: 'facility_type_id',
     referencedColumnName: 'facilityTypeId',
   })
-  facilityType: FacilityType;
+  facilityType: Relation<FacilityType>;
 
-  @OneToOne(
-  () => FacilityAvailability,
-  (availability) => availability.facility,
-)
-availability: FacilityAvailability;
+  @OneToOne(() => FacilityAvailability, (availability) => availability.facility)
+  availability: Relation<FacilityAvailability>;
 
-@OneToOne(
-  () => FacilityPricing,
-  (pricing) => pricing.facility,
-)
-pricing: FacilityPricing;
+  @OneToOne(() => FacilityPricing, (pricing) => pricing.facility)
+  pricing: Relation<FacilityPricing>;
 
-@OneToOne(
-  () => FacilityRequirement,
-  (requirement) => requirement.facility,
-)
-requirement: FacilityRequirement;
+  @OneToOne(() => FacilityRequirement, (requirement) => requirement.facility)
+  requirement: Relation<FacilityRequirement>;
 }
