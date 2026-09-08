@@ -2,28 +2,80 @@ import type { Config } from 'jest';
 import { pathsToModuleNameMapper } from 'ts-jest';
 import ts from 'typescript';
 
-// Path aliases (e.g. the ones added by `nest g library`) live in tsconfig.json,
-// so they are read from there instead of being duplicated here.
+// tsconfig.json に定義された Path Alias を読み込む
+// 例: @app/*, @libs/* など
 const { config: tsconfig } = ts.readConfigFile(
   './tsconfig.json',
   ts.sys.readFile,
 );
-const paths = tsconfig?.compilerOptions?.paths ?? {};
+
+const paths =
+  tsconfig?.compilerOptions?.paths ?? {};
 
 const config: Config = {
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  // Jestが対象とするファイル拡張子
+  moduleFileExtensions: [
+    'js',
+    'json',
+    'ts',
+  ],
+
+  // backendディレクトリを基準とする
   rootDir: '.',
+
+  // *.spec.ts をテスト対象とする
   testRegex: '.*\\.spec\\.ts$',
+
+  /**
+   * TypeScriptをESMとして変換する。
+   *
+   * 現在のtsconfig.jsonが
+   * module: nodenext
+   * なので、Jest側もESMへ合わせる。
+   */
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: './tsconfig.spec.json',
+      },
+    ],
   },
-  moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+
+  // .tsファイルをES Moduleとして扱う
+  extensionsToTreatAsEsm: [
+    '.ts',
+  ],
+
+  /**
+   * TypeScriptのPath Aliasを
+   * Jestでも利用可能にする。
+   */
+  moduleNameMapper: {
+    ...pathsToModuleNameMapper(
+      paths,
+      {
+        prefix: '<rootDir>/',
+      },
+    ),
+
+    /**
+     * NodeNext / ESM環境で
+     * import末尾に.jsが付く場合への対応。
+     */
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+
   collectCoverageFrom: [
     'src/**/*.(t|j)s',
     'libs/**/*.(t|j)s',
     'apps/**/*.(t|j)s',
   ],
-  coverageDirectory: './coverage',
+
+  coverageDirectory:
+    './coverage',
+
   testEnvironment: 'node',
 };
 

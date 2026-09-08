@@ -8,9 +8,13 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+import type { Relation } from 'typeorm';
+
 import { Facility } from './facility.entity';
 
-@Entity({ name: 'facility_requirement' })
+@Entity({
+  name: 'facility_requirement',
+})
 export class FacilityRequirement {
   @PrimaryGeneratedColumn('uuid', {
     name: 'requirement_id',
@@ -83,12 +87,15 @@ export class FacilityRequirement {
   })
   updatedAt: Date;
 
-  @OneToOne(() => Facility, {
-    onDelete: 'RESTRICT',
-  })
+  @OneToOne(
+    () => Facility,
+    {
+      onDelete: 'RESTRICT',
+    },
+  )
   @JoinColumn({
     name: 'facility_id',
     referencedColumnName: 'facilityId',
   })
-  facility: Facility;
+  facility: Relation<Facility>;
 }
