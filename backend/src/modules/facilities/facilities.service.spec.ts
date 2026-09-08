@@ -23,6 +23,8 @@ import { FacilityRequirement } from './entities/facility-requirement.entity';
 
 import { FacilitiesService } from './facilities.service';
 
+import { FacilityPricing } from './entities/facility-pricing.entity';
+
 describe('FacilitiesService updateAvailability', () => {
   let service: FacilitiesService;
 
@@ -87,6 +89,22 @@ describe('FacilitiesService updateAvailability', () => {
     save: jest.fn<
       (requirement: FacilityRequirement) => Promise<FacilityRequirement>
     >(),
+  };
+
+  /**
+   * FacilityPricing Repository モック。
+   */
+  const facilityPricingRepository = {
+    findOne:
+      jest.fn<
+        (
+          options: FindOneOptions<FacilityPricing>,
+        ) => Promise<FacilityPricing | null>
+      >(),
+
+    create: jest.fn<(input: Partial<FacilityPricing>) => FacilityPricing>(),
+
+    save: jest.fn<(pricing: FacilityPricing) => Promise<FacilityPricing>>(),
   };
 
   /**
@@ -177,6 +195,30 @@ describe('FacilitiesService updateAvailability', () => {
     }) as unknown as FacilityRequirement;
 
   /**
+   * テスト用料金情報を生成する。
+   */
+  const createPricing = (): FacilityPricing =>
+    ({
+      pricingId: 'ce8848d1-b654-485b-a962-93bdc8e88d7d',
+
+      facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+
+      monthlyCostMin: 120000,
+
+      monthlyCostMax: 180000,
+
+      entranceFee: 0,
+
+      note: '医療費・介護保険自己負担分は別途必要です。',
+
+      createdAt: new Date(),
+
+      updatedAt: new Date(),
+
+      facility: undefined,
+    }) as unknown as FacilityPricing;
+
+  /**
    * テスト用FacilityStaffを生成する。
    */
   const createFacilityStaff = (
@@ -257,11 +299,18 @@ describe('FacilitiesService updateAvailability', () => {
     /**
      * FacilitiesServiceのconstructorは4引数。
      */
+    const pricingRepo =
+      facilityPricingRepository as unknown as Repository<FacilityPricing>;
+
+    /**
+     * FacilitiesServiceのconstructorは5引数。
+     */
     service = new FacilitiesService(
       facilityRepo,
       availabilityRepo,
       staffRepo,
       requirementRepo,
+      pricingRepo,
     );
   });
 
@@ -753,6 +802,250 @@ describe('FacilitiesService updateAvailability', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updatePricing', () => {
+    it('FACILITYは自施設の料金情報を更新できる', async () => {
+      const facility = createFacility();
+      const pricing = createPricing();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityStaffRepository.findOne.mockResolvedValue(
+        createFacilityStaff(facility.facilityId, facilityUser.userId),
+      );
+
+      facilityPricingRepository.findOne.mockResolvedValue(pricing);
+
+      const savedPricing: FacilityPricing = {
+        ...pricing,
+        monthlyCostMin: 130000,
+        monthlyCostMax: 190000,
+        entranceFee: 50000,
+        note: '料金改定後',
+      };
+
+      facilityPricingRepository.save.mockResolvedValue(savedPricing);
+
+      const result = await service.updatePricing(
+        facility.facilityId,
+        {
+          monthlyCostMin: 130000,
+          monthlyCostMax: 190000,
+          entranceFee: 50000,
+          note: '料金改定後',
+        },
+        facilityUser,
+      );
+
+      expect(result.monthlyCostMin).toBe(130000);
+      expect(result.monthlyCostMax).toBe(190000);
+      expect(result.entranceFee).toBe(50000);
+
+      expect(facilityStaffRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          userId: facilityUser.userId,
+          facilityId: facility.facilityId,
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
+
+      expect(facilityPricingRepository.save).toHaveBeenCalled();
+    });
+
+    it('FACILITYは他施設の料金情報を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityStaffRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updatePricing(
+          facility.facilityId,
+          {
+            monthlyCostMin: 130000,
+          },
+          facilityUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(facilityPricingRepository.findOne).not.toHaveBeenCalled();
+
+      expect(facilityPricingRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('ADMINは任意施設の料金情報を更新できる', async () => {
+      const facility = createFacility();
+      const pricing = createPricing();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityPricingRepository.findOne.mockResolvedValue(pricing);
+
+      const savedPricing: FacilityPricing = {
+        ...pricing,
+        entranceFee: 100000,
+      };
+
+      facilityPricingRepository.save.mockResolvedValue(savedPricing);
+
+      const result = await service.updatePricing(
+        facility.facilityId,
+        {
+          entranceFee: 100000,
+        },
+        adminUser,
+      );
+
+      expect(result.entranceFee).toBe(100000);
+
+      expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+
+      expect(facilityPricingRepository.save).toHaveBeenCalled();
+    });
+
+    it('CARE_MANAGERは料金情報を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      await expect(
+        service.updatePricing(
+          facility.facilityId,
+          {
+            monthlyCostMin: 130000,
+          },
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      expect(facilityPricingRepository.findOne).not.toHaveBeenCalled();
+
+      expect(facilityPricingRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('存在しない施設の料金情報更新は404になる', async () => {
+      facilityRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.updatePricing(
+          'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          {
+            monthlyCostMin: 130000,
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(facilityPricingRepository.findOne).not.toHaveBeenCalled();
+
+      expect(facilityPricingRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('料金情報が未作成の場合は新規作成する', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityPricingRepository.findOne.mockResolvedValue(null);
+
+      const newPricing = createPricing();
+
+      newPricing.monthlyCostMin = 100000;
+      newPricing.monthlyCostMax = 150000;
+      newPricing.entranceFee = 0;
+      newPricing.note = '新規料金情報';
+
+      facilityPricingRepository.create.mockReturnValue(newPricing);
+
+      facilityPricingRepository.save.mockResolvedValue(newPricing);
+
+      const result = await service.updatePricing(
+        facility.facilityId,
+        {
+          monthlyCostMin: 100000,
+          monthlyCostMax: 150000,
+          entranceFee: 0,
+          note: '新規料金情報',
+        },
+        adminUser,
+      );
+
+      expect(facilityPricingRepository.create).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+        monthlyCostMin: 0,
+        monthlyCostMax: 0,
+        entranceFee: 0,
+        note: null,
+      });
+
+      expect(result.facilityId).toBe(facility.facilityId);
+
+      expect(facilityPricingRepository.save).toHaveBeenCalled();
+    });
+
+    it('PATCHでは指定された料金項目だけ更新する', async () => {
+      const facility = createFacility();
+      const originalPricing = createPricing();
+
+      originalPricing.monthlyCostMin = 120000;
+      originalPricing.monthlyCostMax = 180000;
+      originalPricing.entranceFee = 0;
+      originalPricing.note = '元のメモ';
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityPricingRepository.findOne.mockResolvedValue(originalPricing);
+
+      facilityPricingRepository.save.mockImplementation(
+        async (target: FacilityPricing) => target,
+      );
+
+      const result = await service.updatePricing(
+        facility.facilityId,
+        {
+          entranceFee: 50000,
+        },
+        adminUser,
+      );
+
+      expect(result.entranceFee).toBe(50000);
+      expect(result.monthlyCostMin).toBe(120000);
+      expect(result.monthlyCostMax).toBe(180000);
+      expect(result.note).toBe('元のメモ');
+
+      expect(facilityPricingRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          monthlyCostMin: 120000,
+          monthlyCostMax: 180000,
+          entranceFee: 50000,
+          note: '元のメモ',
+        }),
+      );
+    });
+
+    it('monthlyCostMinがmonthlyCostMaxを上回る場合は400になる', async () => {
+      const facility = createFacility();
+      const pricing = createPricing();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityPricingRepository.findOne.mockResolvedValue(pricing);
+
+      await expect(
+        service.updatePricing(
+          facility.facilityId,
+          {
+            monthlyCostMin: 200000,
+            monthlyCostMax: 150000,
+          },
+          adminUser,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(facilityPricingRepository.save).not.toHaveBeenCalled();
     });
   });
 });

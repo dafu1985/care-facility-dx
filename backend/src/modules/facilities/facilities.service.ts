@@ -30,6 +30,12 @@ import { Facility } from './entities/facility.entity';
 
 import { FacilityMapper } from './facility.mapper';
 
+import { FacilityPricing } from './entities/facility-pricing.entity';
+
+import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
+
+import { FacilityPricingResponseDto } from './dto/facility-pricing-response.dto';
+
 @Injectable()
 export class FacilitiesService {
   constructor(
@@ -44,6 +50,9 @@ export class FacilitiesService {
 
     @InjectRepository(FacilityRequirement)
     private readonly facilityRequirementRepository: Repository<FacilityRequirement>,
+
+    @InjectRepository(FacilityPricing)
+    private readonly facilityPricingRepository: Repository<FacilityPricing>,
   ) {}
 
   /**
@@ -417,6 +426,86 @@ export class FacilitiesService {
   }
 
   /**
+   * 施設の料金情報を更新する。
+   *
+   * FACILITY:
+   * ACTIVE状態で所属している自施設のみ更新可能。
+   *
+   * ADMIN:
+   * 全施設更新可能。
+   *
+   * CARE_MANAGER:
+   * 更新不可。
+   */
+  async updatePricing(
+    facilityId: string,
+    dto: UpdateFacilityPricingDto,
+    user: AuthenticatedUser,
+  ): Promise<FacilityPricingResponseDto> {
+    const facility = await this.facilityRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    await this.assertFacilityUpdateAccess(facilityId, user, 'pricing');
+
+    let pricing = await this.facilityPricingRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    if (!pricing) {
+      pricing = this.facilityPricingRepository.create({
+        facilityId,
+        monthlyCostMin: 0,
+        monthlyCostMax: 0,
+        entranceFee: 0,
+        note: null,
+      });
+    }
+
+    if (dto.monthlyCostMin !== undefined) {
+      pricing.monthlyCostMin = dto.monthlyCostMin;
+    }
+
+    if (dto.monthlyCostMax !== undefined) {
+      pricing.monthlyCostMax = dto.monthlyCostMax;
+    }
+
+    if (dto.entranceFee !== undefined) {
+      pricing.entranceFee = dto.entranceFee;
+    }
+
+    if (dto.note !== undefined) {
+      pricing.note = dto.note;
+    }
+
+    if (pricing.monthlyCostMin > pricing.monthlyCostMax) {
+      throw new BadRequestException(
+        'monthlyCostMin must be less than or equal to monthlyCostMax',
+      );
+    }
+
+    const saved = await this.facilityPricingRepository.save(pricing);
+
+    return {
+      pricingId: saved.pricingId,
+      facilityId: saved.facilityId,
+      monthlyCostMin: saved.monthlyCostMin,
+      monthlyCostMax: saved.monthlyCostMax,
+      entranceFee: saved.entranceFee,
+      note: saved.note,
+      updatedAt: saved.updatedAt,
+    };
+  }
+
+  /**
    * 施設更新系API共通の認可処理。
    *
    * FACILITY:
@@ -431,7 +520,7 @@ export class FacilitiesService {
   private async assertFacilityUpdateAccess(
     facilityId: string,
     user: AuthenticatedUser,
-    resource: 'availability' | 'requirement',
+    resource: 'availability' | 'requirement' | 'pricing',
   ): Promise<void> {
     /**
      * ADMINは所属確認不要。
@@ -472,8 +561,14 @@ export class FacilitiesService {
       );
     }
 
+    if (resource === 'requirement') {
+      throw new ForbiddenException(
+        'You are not allowed to update facility requirements',
+      );
+    }
+
     throw new ForbiddenException(
-      'You are not allowed to update facility requirements',
+      'You are not allowed to update facility pricing',
     );
   }
 }
