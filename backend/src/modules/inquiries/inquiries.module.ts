@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AuthModule } from '../auth/auth.module';
+
 import { Inquiry } from './entities/inquiry.entity';
 import { InquiryMessage } from './entities/inquiry-message.entity';
-import { InquiriesService } from './inquiries.service';
 import { InquiriesController } from './inquiries.controller';
+import { InquiriesService } from './inquiries.service';
 
 @Module({
   imports: [
@@ -12,13 +14,17 @@ import { InquiriesController } from './inquiries.controller';
       Inquiry,
       InquiryMessage,
     ]),
+    AuthModule,
   ],
-  controllers: [InquiriesController],
-  providers: [InquiriesService],
+  controllers: [
+    InquiriesController,
+  ],
+  providers: [
+    InquiriesService,
+  ],
   exports: [
     TypeOrmModule,
     InquiriesService,
   ],
 })
-
 export class InquiriesModule {}

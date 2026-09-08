@@ -3,10 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { FacilitiesController } from './facilities.controller';
 import { FacilitiesService } from './facilities.service';
+
 import { Facility } from './entities/facility.entity';
 import { FacilityAvailability } from './entities/facility-availability.entity';
 import { FacilityPricing } from './entities/facility-pricing.entity';
 import { FacilityRequirement } from './entities/facility-requirement.entity';
+import { FacilityStaff } from './entities/facility-staff.entity';
 import { FacilityType } from './entities/facility-type.entity';
 
 @Module({
@@ -17,10 +19,17 @@ import { FacilityType } from './entities/facility-type.entity';
       FacilityAvailability,
       FacilityPricing,
       FacilityRequirement,
+      FacilityStaff,
     ]),
   ],
-  controllers: [FacilitiesController],
-  providers: [FacilitiesService],
-  exports: [TypeOrmModule],
+  controllers: [
+    FacilitiesController,
+  ],
+  providers: [
+    FacilitiesService,
+  ],
+  exports: [
+    TypeOrmModule,
+  ],
 })
 export class FacilitiesModule {}

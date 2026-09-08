@@ -8,6 +8,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CareManagersModule } from './modules/care-managers/care-managers.module';
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { InquiriesModule } from './modules/inquiries/inquiries.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { InquiriesModule } from './modules/inquiries/inquiries.module';
     CareManagersModule,
     FacilitiesModule,
     InquiriesModule,
+    AuthModule,
   ],
 
   controllers: [AppController],
