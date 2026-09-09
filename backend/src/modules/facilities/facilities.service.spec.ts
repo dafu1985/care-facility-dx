@@ -24,6 +24,7 @@ import { FacilityRequirement } from './entities/facility-requirement.entity';
 import { FacilitiesService } from './facilities.service';
 
 import { FacilityPricing } from './entities/facility-pricing.entity';
+import type { FacilityResponseDto } from './dto/facility-response.dto';
 
 describe('FacilitiesService updateAvailability', () => {
   let service: FacilitiesService;
@@ -39,6 +40,8 @@ describe('FacilitiesService updateAvailability', () => {
       jest.fn<
         (options: FindOneOptions<Facility>) => Promise<Facility | null>
       >(),
+
+    save: jest.fn<(facility: Facility) => Promise<Facility>>(),
   };
 
   /**
@@ -802,6 +805,278 @@ describe('FacilitiesService updateAvailability', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(facilityRequirementRepository.save).not.toHaveBeenCalled();
+    });
+    describe('updateFacility', () => {
+      /**
+       * updateFacility() は保存後に findOne() を呼ぶため、
+       * 最新施設情報を返す部分をモックする。
+       */
+      const mockFacilityResponse = (facility: Facility): FacilityResponseDto =>
+        ({
+          facilityId: facility.facilityId,
+
+          facilityTypeId: facility.facilityTypeId,
+
+          name: facility.name,
+
+          postalCode: facility.postalCode,
+
+          address: facility.address,
+
+          area: facility.area,
+
+          phone: facility.phone,
+
+          description: facility.description,
+        }) as unknown as FacilityResponseDto;
+
+      it('FACILITYは自施設の基本情報を更新できる', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityStaffRepository.findOne.mockResolvedValue(
+          createFacilityStaff(facility.facilityId, facilityUser.userId),
+        );
+
+        facilityRepository.save.mockImplementation(
+          async (target: Facility) => target,
+        );
+
+        const updatedResponse = {
+          ...mockFacilityResponse(facility),
+
+          name: 'サンプル介護ホーム新潟',
+
+          area: '新潟市中央区',
+        } as FacilityResponseDto;
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(updatedResponse);
+
+        const result = await service.updateFacility(
+          facility.facilityId,
+
+          {
+            name: 'サンプル介護ホーム新潟',
+
+            area: '新潟市中央区',
+          },
+
+          facilityUser,
+        );
+
+        expect(facilityStaffRepository.findOne).toHaveBeenCalledWith({
+          where: {
+            userId: facilityUser.userId,
+
+            facilityId: facility.facilityId,
+
+            status: FacilityStaffStatus.ACTIVE,
+          },
+        });
+
+        expect(facilityRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'サンプル介護ホーム新潟',
+
+            area: '新潟市中央区',
+          }),
+        );
+
+        expect(result.name).toBe('サンプル介護ホーム新潟');
+      });
+
+      it('FACILITYは他施設の基本情報を更新できない', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityStaffRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateFacility(
+            facility.facilityId,
+
+            {
+              name: '更新不可施設',
+            },
+
+            facilityUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(facilityRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('ADMINは任意施設の基本情報を更新できる', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityRepository.save.mockImplementation(
+          async (target: Facility) => target,
+        );
+
+        const updatedResponse = {
+          ...mockFacilityResponse(facility),
+
+          phone: '025-999-9999',
+        } as FacilityResponseDto;
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(updatedResponse);
+
+        const result = await service.updateFacility(
+          facility.facilityId,
+
+          {
+            phone: '025-999-9999',
+          },
+
+          adminUser,
+        );
+
+        expect(result.phone).toBe('025-999-9999');
+
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+
+        expect(facilityRepository.save).toHaveBeenCalled();
+      });
+
+      it('CARE_MANAGERは施設基本情報を更新できない', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        await expect(
+          service.updateFacility(
+            facility.facilityId,
+
+            {
+              name: '更新不可',
+            },
+
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(facilityRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('存在しない施設の基本情報更新は404になる', async () => {
+        facilityRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateFacility(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+
+            {
+              name: '存在しない施設',
+            },
+
+            adminUser,
+          ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+
+        expect(facilityRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('PATCHでは指定された基本情報だけ更新する', async () => {
+        const facility = createFacility();
+
+        facility.name = '元の施設名';
+
+        facility.area = '新潟市';
+
+        facility.phone = '025-111-1111';
+
+        facility.description = '元の説明';
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityRepository.save.mockImplementation(
+          async (target: Facility) => target,
+        );
+
+        const updatedResponse = {
+          ...mockFacilityResponse(facility),
+
+          name: '変更後施設名',
+        } as FacilityResponseDto;
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(updatedResponse);
+
+        await service.updateFacility(
+          facility.facilityId,
+
+          {
+            name: '変更後施設名',
+          },
+
+          adminUser,
+        );
+
+        expect(facilityRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: '変更後施設名',
+
+            area: '新潟市',
+
+            phone: '025-111-1111',
+
+            description: '元の説明',
+          }),
+        );
+      });
+
+      it('nullable項目はnullでクリアできる', async () => {
+        const facility = createFacility();
+
+        facility.phone = '025-111-1111';
+
+        facility.description = '施設説明';
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityRepository.save.mockImplementation(
+          async (target: Facility) => target,
+        );
+
+        const updatedResponse = {
+          ...mockFacilityResponse(facility),
+
+          phone: null,
+
+          description: null,
+        } as FacilityResponseDto;
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(updatedResponse);
+
+        const result = await service.updateFacility(
+          facility.facilityId,
+
+          {
+            phone: null,
+
+            description: null,
+          },
+
+          adminUser,
+        );
+
+        expect(facilityRepository.save).toHaveBeenCalledWith(
+          expect.objectContaining({
+            phone: null,
+
+            description: null,
+          }),
+        );
+
+        expect(result.phone).toBeNull();
+
+        expect(result.description).toBeNull();
+      });
     });
   });
 

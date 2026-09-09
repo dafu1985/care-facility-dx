@@ -35,6 +35,7 @@ import { FacilityPricing } from './entities/facility-pricing.entity';
 import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 
 import { FacilityPricingResponseDto } from './dto/facility-pricing-response.dto';
+import { UpdateFacilityDto } from './dto/update-facility.dto';
 
 @Injectable()
 export class FacilitiesService {
@@ -203,6 +204,80 @@ export class FacilitiesService {
     }
 
     return FacilityMapper.toResponse(facility);
+  }
+
+  /**
+   * 施設基本情報を更新する。
+   *
+   * FACILITY:
+   * ACTIVE状態で所属している自施設のみ更新可能。
+   *
+   * ADMIN:
+   * 全施設更新可能。
+   *
+   * CARE_MANAGER:
+   * 更新不可。
+   */
+  async updateFacility(
+    facilityId: string,
+    dto: UpdateFacilityDto,
+    user: AuthenticatedUser,
+  ): Promise<FacilityResponseDto> {
+    /**
+     * 更新対象施設を取得。
+     */
+    const facility = await this.facilityRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    /**
+     * 既存の共通認可を利用。
+     */
+    await this.assertFacilityUpdateAccess(facilityId, user, 'facility');
+
+    /**
+     * PATCHなので指定項目のみ更新する。
+     */
+    if (dto.facilityTypeId !== undefined) {
+      facility.facilityTypeId = dto.facilityTypeId;
+    }
+
+    if (dto.name !== undefined) {
+      facility.name = dto.name;
+    }
+
+    if (dto.postalCode !== undefined) {
+      facility.postalCode = dto.postalCode;
+    }
+
+    if (dto.address !== undefined) {
+      facility.address = dto.address;
+    }
+
+    if (dto.area !== undefined) {
+      facility.area = dto.area;
+    }
+
+    if (dto.phone !== undefined) {
+      facility.phone = dto.phone;
+    }
+
+    if (dto.description !== undefined) {
+      facility.description = dto.description;
+    }
+
+    await this.facilityRepository.save(facility);
+
+    /**
+     * Relation込みの最新状態を返す。
+     */
+    return this.findOne(facilityId);
   }
 
   /**
@@ -520,7 +595,7 @@ export class FacilitiesService {
   private async assertFacilityUpdateAccess(
     facilityId: string,
     user: AuthenticatedUser,
-    resource: 'availability' | 'requirement' | 'pricing',
+    resource: 'availability' | 'requirement' | 'pricing' | 'facility',
   ): Promise<void> {
     /**
      * ADMINは所属確認不要。
@@ -536,9 +611,7 @@ export class FacilitiesService {
       const facilityStaff = await this.facilityStaffRepository.findOne({
         where: {
           userId: user.userId,
-
           facilityId,
-
           status: FacilityStaffStatus.ACTIVE,
         },
       });
@@ -567,8 +640,14 @@ export class FacilitiesService {
       );
     }
 
+    if (resource === 'pricing') {
+      throw new ForbiddenException(
+        'You are not allowed to update facility pricing',
+      );
+    }
+
     throw new ForbiddenException(
-      'You are not allowed to update facility pricing',
+      'You are not allowed to update facility information',
     );
   }
 }
