@@ -1322,5 +1322,224 @@ describe('FacilitiesService updateAvailability', () => {
 
       expect(facilityPricingRepository.save).not.toHaveBeenCalled();
     });
+    describe('getDashboard', () => {
+      /**
+       * ダッシュボード用の施設詳細レスポンスを生成する。
+       */
+      const createDashboardFacilityResponse = (): FacilityResponseDto =>
+        ({
+          facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+
+          name: 'サンプル介護ホーム新潟',
+
+          postalCode: '950-0000',
+
+          address: '新潟県新潟市中央区サンプル1-2-3',
+
+          area: '新潟市中央区',
+
+          phone: null,
+
+          description: null,
+
+          status: 'ACTIVE',
+
+          facilityType: {
+            facilityTypeId: 'f611d3fa-a0b6-49ef-857e-1b1c15c1248c',
+
+            name: '住宅型有料老人ホーム',
+          },
+
+          availability: {
+            availabilityId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+
+            facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+
+            status: AvailabilityStatus.AVAILABLE,
+
+            availableCount: 2,
+
+            availableFrom: '2026-09-15',
+
+            note: '現在2床空きあり',
+
+            updatedAt: new Date(),
+          },
+
+          pricing: {
+            pricingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+
+            facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+
+            monthlyCostMin: 120000,
+
+            monthlyCostMax: 180000,
+
+            entranceFee: 0,
+
+            note: '医療費等は別途必要',
+
+            updatedAt: new Date(),
+          },
+
+          requirement: {
+            requirementId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+
+            facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+
+            minCareLevel: 1,
+
+            maxCareLevel: 5,
+
+            dementiaAccepted: true,
+
+            medicalCareAccepted: true,
+
+            wheelchairAccepted: true,
+
+            endOfLifeCare: false,
+
+            note: '詳細は事前相談',
+
+            updatedAt: new Date(),
+          },
+        }) as unknown as FacilityResponseDto;
+
+      it('FACILITYは自施設のダッシュボードを取得できる', async () => {
+        const facility = createFacility();
+
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityStaffRepository.findOne.mockResolvedValue(
+          createFacilityStaff(facility.facilityId, facilityUser.userId),
+        );
+
+        /**
+         * getDashboard()内部のfindOne()をモックする。
+         */
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          facilityUser,
+        );
+
+        expect(result.facility.facilityId).toBe(facility.facilityId);
+
+        expect(result.completion).toEqual({
+          availability: true,
+
+          pricing: true,
+
+          requirement: true,
+        });
+
+        expect(facilityStaffRepository.findOne).toHaveBeenCalledWith({
+          where: {
+            userId: facilityUser.userId,
+
+            facilityId: facility.facilityId,
+
+            status: FacilityStaffStatus.ACTIVE,
+          },
+        });
+      });
+
+      it('FACILITYは他施設のダッシュボードを取得できない', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        facilityStaffRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.getDashboard(facility.facilityId, facilityUser),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(facilityStaffRepository.findOne).toHaveBeenCalled();
+
+        expect(facilityRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('ADMINは任意施設のダッシュボードを取得できる', async () => {
+        const facility = createFacility();
+
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.facility.facilityId).toBe(facility.facilityId);
+
+        /**
+         * ADMINはfacility_staff確認不要。
+         */
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      });
+
+      it('CARE_MANAGERはダッシュボードを取得できない', async () => {
+        const facility = createFacility();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        await expect(
+          service.getDashboard(facility.facilityId, careManagerUser),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      });
+
+      it('存在しない施設のダッシュボードは404になる', async () => {
+        facilityRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.getDashboard(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            adminUser,
+          ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      });
+
+      it('未登録情報がある場合completionはfalseになる', async () => {
+        const facility = createFacility();
+
+        const facilityDetail = createDashboardFacilityResponse();
+
+        /**
+         * pricingとrequirementを
+         * 未登録状態にする。
+         */
+        facilityDetail.pricing = null;
+
+        facilityDetail.requirement = null;
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.completion).toEqual({
+          availability: true,
+
+          pricing: false,
+
+          requirement: false,
+        });
+      });
+    });
   });
 });

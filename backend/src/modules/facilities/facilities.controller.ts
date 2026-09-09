@@ -41,11 +41,61 @@ import { UpdateFacilityAvailabilityDto } from './dto/update-facility-availabilit
 import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
+import { FacilityDashboardResponseDto } from './dto/facility-dashboard-response.dto';
 
 @ApiTags('facilities')
 @Controller('facilities')
 export class FacilitiesController {
   constructor(private readonly facilitiesService: FacilitiesService) {}
+
+  /**
+   * 施設側ダッシュボード取得。
+   *
+   * FACILITY:
+   * 自施設のみ取得可能。
+   *
+   * ADMIN:
+   * 任意施設取得可能。
+   */
+  @Get(':facilityId/dashboard')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FACILITY, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '施設側ダッシュボードを取得する',
+    description:
+      '施設職員は自施設、管理者は任意施設のダッシュボード情報を取得します。',
+  })
+  @ApiParam({
+    name: 'facilityId',
+    description: '施設ID',
+    example: '5ea06a45-7587-4198-b94c-56e0044399c7',
+  })
+  @ApiOkResponse({
+    description: '施設ダッシュボードの取得に成功',
+    type: FacilityDashboardResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '施設IDの形式が不正',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'JWTが未指定または不正',
+  })
+  @ApiForbiddenResponse({
+    description: 'この施設のダッシュボードを参照する権限がない',
+  })
+  @ApiNotFoundResponse({
+    description: '指定された施設が存在しない',
+  })
+  async getDashboard(
+    @Param('facilityId', new ParseUUIDPipe())
+    facilityId: string,
+
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ): Promise<FacilityDashboardResponseDto> {
+    return this.facilitiesService.getDashboard(facilityId, user);
+  }
 
   /**
    * 介護施設一覧検索。

@@ -36,6 +36,7 @@ import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 
 import { FacilityPricingResponseDto } from './dto/facility-pricing-response.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
+import { FacilityDashboardResponseDto } from './dto/facility-dashboard-response.dto';
 
 @Injectable()
 export class FacilitiesService {
@@ -55,6 +56,86 @@ export class FacilitiesService {
     @InjectRepository(FacilityPricing)
     private readonly facilityPricingRepository: Repository<FacilityPricing>,
   ) {}
+
+  /**
+   * 施設側ダッシュボードを取得する。
+   *
+   * FACILITY:
+   * ACTIVE状態で所属している自施設のみ取得可能。
+   *
+   * ADMIN:
+   * 任意施設取得可能。
+   *
+   * CARE_MANAGER:
+   * 取得不可。
+   */
+  async getDashboard(
+    facilityId: string,
+    user: AuthenticatedUser,
+  ): Promise<FacilityDashboardResponseDto> {
+    /**
+     * まず施設存在確認。
+     */
+    const facility = await this.facilityRepository.findOne({
+      where: {
+        facilityId,
+      },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    /**
+     * Dashboard参照権限確認。
+     *
+     * ADMINは任意施設。
+     * FACILITYは自施設のみ。
+     */
+    if (user.role === UserRole.FACILITY) {
+      const facilityStaff = await this.facilityStaffRepository.findOne({
+        where: {
+          userId: user.userId,
+
+          facilityId,
+
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
+
+      if (!facilityStaff) {
+        throw new ForbiddenException(
+          'You do not have permission to access this facility dashboard',
+        );
+      }
+    } else if (user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'You are not allowed to access facility dashboard',
+      );
+    }
+
+    /**
+     * Relation込みの施設詳細を取得する。
+     */
+    const facilityDetail = await this.findOne(facilityId);
+
+    /**
+     * 各情報の登録状況。
+     *
+     * フロント側で未入力アラート等に利用する。
+     */
+    return {
+      facility: facilityDetail,
+
+      completion: {
+        availability: facilityDetail.availability !== null,
+
+        pricing: facilityDetail.pricing !== null,
+
+        requirement: facilityDetail.requirement !== null,
+      },
+    };
+  }
 
   /**
    * 施設一覧を取得する。
