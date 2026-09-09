@@ -40,6 +40,7 @@ import { FacilitySearchDto } from './dto/facility-search.dto';
 import { UpdateFacilityAvailabilityDto } from './dto/update-facility-availability.dto';
 import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
+import { UpdateFacilityDto } from './dto/update-facility.dto';
 
 @ApiTags('facilities')
 @Controller('facilities')
@@ -106,7 +107,7 @@ export class FacilitiesController {
   }
 
   /**
-   * 施設の空き状況更新。
+   * 施設基本情報更新。
    *
    * FACILITY:
    * 自分がACTIVE状態で所属している施設のみ更新可能。
@@ -116,6 +117,51 @@ export class FacilitiesController {
    *
    * CARE_MANAGER:
    * RolesGuardで拒否。
+   */
+  @Patch(':facilityId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FACILITY, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '介護施設の基本情報を更新する',
+    description: '施設職員は自施設、管理者は任意施設の基本情報を更新します。',
+  })
+  @ApiParam({
+    name: 'facilityId',
+    description: '施設ID',
+    example: '5ea06a45-7587-4198-b94c-56e0044399c7',
+  })
+  @ApiOkResponse({
+    description: '施設基本情報の更新に成功',
+    type: FacilityResponseDto,
+  })
+  @ApiBadRequestResponse({
+    description: '施設IDまたは入力値が不正',
+  })
+  @ApiUnauthorizedResponse({
+    description: 'JWTが未指定または不正',
+  })
+  @ApiForbiddenResponse({
+    description: 'この施設の基本情報を更新する権限がない',
+  })
+  @ApiNotFoundResponse({
+    description: '指定された施設が存在しない',
+  })
+  async updateFacility(
+    @Param('facilityId', new ParseUUIDPipe())
+    facilityId: string,
+
+    @Body()
+    dto: UpdateFacilityDto,
+
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ): Promise<FacilityResponseDto> {
+    return this.facilitiesService.updateFacility(facilityId, dto, user);
+  }
+
+  /**
+   * 施設の空き状況更新。
    */
   @Patch(':facilityId/availability')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -161,15 +207,6 @@ export class FacilitiesController {
 
   /**
    * 施設の受入条件更新。
-   *
-   * FACILITY:
-   * 自分がACTIVE状態で所属している施設のみ更新可能。
-   *
-   * ADMIN:
-   * 全施設更新可能。
-   *
-   * CARE_MANAGER:
-   * RolesGuardで拒否。
    */
   @Patch(':facilityId/requirement')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -215,15 +252,6 @@ export class FacilitiesController {
 
   /**
    * 施設の料金情報更新。
-   *
-   * FACILITY:
-   * 自分がACTIVE状態で所属している施設のみ更新可能。
-   *
-   * ADMIN:
-   * 全施設更新可能。
-   *
-   * CARE_MANAGER:
-   * RolesGuardで拒否。
    */
   @Patch(':facilityId/pricing')
   @UseGuards(JwtAuthGuard, RolesGuard)
