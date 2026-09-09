@@ -39,6 +39,9 @@ export function LoginPage() {
     setLoading(true);
 
     try {
+      /**
+       * Backendへログイン要求を送信する。
+       */
       const response = await login({
         email,
         password,
@@ -50,13 +53,19 @@ export function LoginPage() {
       saveAccessToken(response.accessToken);
 
       /**
-       * ログイン成功後は、
-       * 一旦ホームへ遷移する。
+       * ログイン成功後は
+       * ホーム画面へ遷移する。
        *
-       * 後ほど施設ダッシュボードへ変更する。
+       * HomePage側でユーザー権限を判定し、
+       * FACILITY / CARE_MANAGERごとの
+       * 画面を表示する。
        */
-      navigate("/");
-    } catch {
+      navigate("/", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error("ログインに失敗しました。", error);
+
       setError("メールアドレスまたはパスワードが正しくありません。");
     } finally {
       setLoading(false);
@@ -112,7 +121,9 @@ export function LoginPage() {
               label="メールアドレス"
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) => {
+                setEmail(event.target.value);
+              }}
               required
               fullWidth
               autoComplete="email"
@@ -125,7 +136,9 @@ export function LoginPage() {
               label="パスワード"
               type="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+              }}
               required
               fullWidth
               autoComplete="current-password"
