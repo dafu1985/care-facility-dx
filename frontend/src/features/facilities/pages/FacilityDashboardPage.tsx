@@ -18,6 +18,7 @@ import { PricingEditDialog } from "../components/PricingEditDialog";
 import type { FacilityDashboardResponse } from "../types/facility";
 import { RequirementEditDialog } from "../components/RequirementEditDialog";
 import { FacilityEditDialog } from "../components/FacilityEditDialog";
+import { removeAccessToken } from "../../auth/utils/token-storage";
 
 interface FacilityDashboardPageProps {
   facilityId: string;
@@ -36,6 +37,20 @@ export function FacilityDashboardPage({
    * 画面遷移用。
    */
   const navigate = useNavigate();
+
+  /**
+   * ログアウト処理。
+   *
+   * 保存されているJWTを削除し、
+   * ログイン画面へ遷移する。
+   */
+  const handleLogout = () => {
+    removeAccessToken();
+
+    navigate("/login", {
+      replace: true,
+    });
+  };
   const [dashboard, setDashboard] = useState<FacilityDashboardResponse | null>(
     null,
   );
@@ -176,6 +191,24 @@ export function FacilityDashboardPage({
         }}
       >
         <Stack spacing={3}>
+          {/* ダッシュボードヘッダー */}
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <Typography variant="h5" component="h1">
+              施設ダッシュボード
+            </Typography>
+
+            <Button variant="outlined" onClick={handleLogout}>
+              ログアウト
+            </Button>
+          </Box>
+
           {/* 施設基本情報 */}
           <Card>
             <CardContent>
