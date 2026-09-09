@@ -5,10 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
+
+import { Inquiry, InquiryStatus } from '../inquiries/entities/inquiry.entity';
+import { InquiryMessageType } from '../inquiries/entities/inquiry-message.entity';
 
 import { FacilityAvailabilityResponseDto } from './dto/facility-availability-response.dto';
 import { FacilityRequirementResponseDto } from './dto/facility-requirement-response.dto';
@@ -55,6 +58,9 @@ export class FacilitiesService {
 
     @InjectRepository(FacilityPricing)
     private readonly facilityPricingRepository: Repository<FacilityPricing>,
+
+    @InjectRepository(Inquiry)
+    private readonly inquiryRepository: Repository<Inquiry>,
   ) {}
 
   /**
@@ -96,9 +102,7 @@ export class FacilitiesService {
       const facilityStaff = await this.facilityStaffRepository.findOne({
         where: {
           userId: user.userId,
-
           facilityId,
-
           status: FacilityStaffStatus.ACTIVE,
         },
       });
@@ -120,10 +124,56 @@ export class FacilitiesService {
     const facilityDetail = await this.findOne(facilityId);
 
     /**
-     * 各情報の登録状況。
+     * 未完了問い合わせを取得する。
      *
-     * フロント側で未入力アラート等に利用する。
+     * unanswered判定で最新MESSAGEの送信者Roleを見るため、
+     * messages.senderUserまでRelationを取得する。
      */
+    const activeInquiries = await this.inquiryRepository.find({
+      where: {
+        facilityId,
+        status: In([InquiryStatus.OPEN, InquiryStatus.IN_PROGRESS]),
+      },
+      relations: {
+        messages: {
+          senderUser: true,
+        },
+      },
+    });
+
+    /**
+     * 未返信問い合わせ件数。
+     *
+     * OPEN / IN_PROGRESS かつ、
+     * 最新のMESSAGE送信者がCARE_MANAGERの場合、
+     * 施設側がまだ返信していないと判定する。
+     *
+     * STATUS_CHANGE / SYSTEM は返信判定から除外する。
+     */
+    const unansweredCount = activeInquiries.filter((inquiry) => {
+      const latestMessage = inquiry.messages
+        .filter((message) => message.type === InquiryMessageType.MESSAGE)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+
+      return latestMessage?.senderUser?.role === UserRole.CARE_MANAGER;
+    }).length;
+
+    /**
+     * 最近の問い合わせを5件取得する。
+     *
+     * lastMessageAtがあるものを優先し、
+     * 同値の場合はcreatedAtの新しい順にする。
+     */
+    const recentInquiries = await this.inquiryRepository
+      .createQueryBuilder('inquiry')
+      .where('inquiry.facilityId = :facilityId', {
+        facilityId,
+      })
+      .orderBy('inquiry.lastMessageAt', 'DESC', 'NULLS LAST')
+      .addOrderBy('inquiry.createdAt', 'DESC')
+      .take(5)
+      .getMany();
+
     return {
       facility: facilityDetail,
 
@@ -133,6 +183,22 @@ export class FacilitiesService {
         pricing: facilityDetail.pricing !== null,
 
         requirement: facilityDetail.requirement !== null,
+      },
+
+      inquirySummary: {
+        openCount: activeInquiries.length,
+
+        unansweredCount,
+
+        recentInquiries: recentInquiries.map((inquiry) => ({
+          inquiryId: inquiry.inquiryId,
+
+          subject: inquiry.subject,
+
+          status: inquiry.status,
+
+          lastMessageAt: inquiry.lastMessageAt,
+        })),
       },
     };
   }

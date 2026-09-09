@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import type { FindOneOptions, Repository } from 'typeorm';
+import type { FindManyOptions, FindOneOptions, Repository } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
@@ -25,6 +25,11 @@ import { FacilitiesService } from './facilities.service';
 
 import { FacilityPricing } from './entities/facility-pricing.entity';
 import type { FacilityResponseDto } from './dto/facility-response.dto';
+import { Inquiry, InquiryStatus } from '../inquiries/entities/inquiry.entity';
+import {
+  InquiryMessage,
+  InquiryMessageType,
+} from '../inquiries/entities/inquiry-message.entity';
 
 describe('FacilitiesService updateAvailability', () => {
   let service: FacilitiesService;
@@ -108,6 +113,25 @@ describe('FacilitiesService updateAvailability', () => {
     create: jest.fn<(input: Partial<FacilityPricing>) => FacilityPricing>(),
 
     save: jest.fn<(pricing: FacilityPricing) => Promise<FacilityPricing>>(),
+  };
+
+  /**
+   * Inquiry Repository モック。
+   */
+  const inquiryQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getMany: jest.fn<() => Promise<Inquiry[]>>(),
+  };
+
+  const inquiryRepository = {
+    find: jest.fn<(options?: FindManyOptions<Inquiry>) => Promise<Inquiry[]>>(),
+
+    createQueryBuilder: jest.fn<() => typeof inquiryQueryBuilder>(
+      () => inquiryQueryBuilder,
+    ),
   };
 
   /**
@@ -281,8 +305,59 @@ describe('FacilitiesService updateAvailability', () => {
     email: 'caremanager@example.com',
   };
 
+  /**
+   * テスト用問い合わせを生成する。
+   */
+  const createInquiry = (overrides: Partial<Inquiry> = {}): Inquiry =>
+    ({
+      inquiryId: '99999999-9999-4999-8999-999999999999',
+      facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
+      createdByUserId: careManagerUser.userId,
+      subject: '空き状況について',
+      status: InquiryStatus.OPEN,
+      lastMessageAt: new Date('2026-09-09T01:30:00.000Z'),
+      createdAt: new Date('2026-09-09T01:00:00.000Z'),
+      updatedAt: new Date('2026-09-09T01:30:00.000Z'),
+      facility: undefined,
+      createdByUser: undefined,
+      messages: [],
+      ...overrides,
+    }) as unknown as Inquiry;
+
+  /**
+   * テスト用問い合わせメッセージを生成する。
+   */
+  const createInquiryMessage = (
+    role: UserRole,
+    createdAt: Date,
+    type: InquiryMessageType = InquiryMessageType.MESSAGE,
+  ): InquiryMessage =>
+    ({
+      messageId: '88888888-8888-4888-8888-888888888888',
+      inquiryId: '99999999-9999-4999-8999-999999999999',
+      senderUserId: '77777777-7777-4777-8777-777777777777',
+      type,
+      body: '問い合わせメッセージ',
+      createdAt,
+      inquiry: undefined,
+      senderUser: {
+        userId: '77777777-7777-4777-8777-777777777777',
+        role,
+        email:
+          role === UserRole.CARE_MANAGER
+            ? 'caremanager@example.com'
+            : 'facilitystaff@example.com',
+      } as never,
+    }) as unknown as InquiryMessage;
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    /**
+     * ダッシュボード問い合わせ関連のデフォルト。
+     */
+    inquiryRepository.find.mockResolvedValue([]);
+    inquiryQueryBuilder.getMany.mockResolvedValue([]);
 
     /**
      * テスト用Repositoryモックを、
@@ -308,12 +383,18 @@ describe('FacilitiesService updateAvailability', () => {
     /**
      * FacilitiesServiceのconstructorは5引数。
      */
+    const inquiryRepo = inquiryRepository as unknown as Repository<Inquiry>;
+
+    /**
+     * FacilitiesServiceのconstructorは6引数。
+     */
     service = new FacilitiesService(
       facilityRepo,
       availabilityRepo,
       staffRepo,
       requirementRepo,
       pricingRepo,
+      inquiryRepo,
     );
   });
 
@@ -1539,6 +1620,183 @@ describe('FacilitiesService updateAvailability', () => {
 
           requirement: false,
         });
+      });
+      it('問い合わせ0件の場合はサマリーが0件になる', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        inquiryRepository.find.mockResolvedValue([]);
+        inquiryQueryBuilder.getMany.mockResolvedValue([]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary).toEqual({
+          openCount: 0,
+          unansweredCount: 0,
+          recentInquiries: [],
+        });
+      });
+
+      it('OPENとIN_PROGRESSの件数がopenCountになる', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        inquiryRepository.find.mockResolvedValue([
+          createInquiry({
+            inquiryId: '11111111-1111-4111-8111-111111111111',
+            status: InquiryStatus.OPEN,
+          }),
+          createInquiry({
+            inquiryId: '22222222-2222-4222-8222-222222222222',
+            status: InquiryStatus.IN_PROGRESS,
+          }),
+        ]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary.openCount).toBe(2);
+      });
+
+      it('最新MESSAGEがCARE_MANAGERなら未返信件数に加算する', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const inquiry = createInquiry({
+          messages: [
+            createInquiryMessage(
+              UserRole.FACILITY,
+              new Date('2026-09-09T01:00:00.000Z'),
+            ),
+            createInquiryMessage(
+              UserRole.CARE_MANAGER,
+              new Date('2026-09-09T02:00:00.000Z'),
+            ),
+          ],
+        });
+
+        inquiryRepository.find.mockResolvedValue([inquiry]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary.unansweredCount).toBe(1);
+      });
+
+      it('最新MESSAGEがFACILITYなら未返信件数に加算しない', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const inquiry = createInquiry({
+          messages: [
+            createInquiryMessage(
+              UserRole.CARE_MANAGER,
+              new Date('2026-09-09T01:00:00.000Z'),
+            ),
+            createInquiryMessage(
+              UserRole.FACILITY,
+              new Date('2026-09-09T02:00:00.000Z'),
+            ),
+          ],
+        });
+
+        inquiryRepository.find.mockResolvedValue([inquiry]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary.unansweredCount).toBe(0);
+      });
+
+      it('SYSTEMやSTATUS_CHANGEは未返信判定の最新MESSAGEに含めない', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const inquiry = createInquiry({
+          messages: [
+            createInquiryMessage(
+              UserRole.CARE_MANAGER,
+              new Date('2026-09-09T01:00:00.000Z'),
+              InquiryMessageType.MESSAGE,
+            ),
+            createInquiryMessage(
+              UserRole.FACILITY,
+              new Date('2026-09-09T02:00:00.000Z'),
+              InquiryMessageType.STATUS_CHANGE,
+            ),
+            createInquiryMessage(
+              UserRole.FACILITY,
+              new Date('2026-09-09T03:00:00.000Z'),
+              InquiryMessageType.SYSTEM,
+            ),
+          ],
+        });
+
+        inquiryRepository.find.mockResolvedValue([inquiry]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary.unansweredCount).toBe(1);
+      });
+
+      it('recentInquiriesに最新問い合わせ一覧を返す', async () => {
+        const facility = createFacility();
+        const facilityDetail = createDashboardFacilityResponse();
+
+        facilityRepository.findOne.mockResolvedValue(facility);
+        jest.spyOn(service, 'findOne').mockResolvedValue(facilityDetail);
+
+        const recentInquiry = createInquiry({
+          inquiryId: '33333333-3333-4333-8333-333333333333',
+          subject: '見学について',
+          status: InquiryStatus.IN_PROGRESS,
+          lastMessageAt: new Date('2026-09-09T03:00:00.000Z'),
+        });
+
+        inquiryQueryBuilder.getMany.mockResolvedValue([recentInquiry]);
+
+        const result = await service.getDashboard(
+          facility.facilityId,
+          adminUser,
+        );
+
+        expect(result.inquirySummary.recentInquiries).toEqual([
+          {
+            inquiryId: recentInquiry.inquiryId,
+            subject: recentInquiry.subject,
+            status: InquiryStatus.IN_PROGRESS,
+            lastMessageAt: recentInquiry.lastMessageAt,
+          },
+        ]);
+
+        expect(inquiryQueryBuilder.take).toHaveBeenCalledWith(5);
       });
     });
   });

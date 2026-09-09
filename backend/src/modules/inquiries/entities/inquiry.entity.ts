@@ -9,19 +9,28 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-import { User } from '../../users/entities/user.entity';
+import type { Relation } from 'typeorm';
+
 import { Facility } from '../../facilities/entities/facility.entity';
+import { User } from '../../users/entities/user.entity';
+
 import { InquiryMessage } from './inquiry-message.entity';
 
 export enum InquiryStatus {
   OPEN = 'OPEN',
+
   IN_PROGRESS = 'IN_PROGRESS',
+
   ANSWERED = 'ANSWERED',
+
   CLOSED = 'CLOSED',
+
   CANCELLED = 'CANCELLED',
 }
 
-@Entity({ name: 'inquiry' })
+@Entity({
+  name: 'inquiry',
+})
 export class Inquiry {
   @PrimaryGeneratedColumn('uuid', {
     name: 'inquiry_id',
@@ -72,6 +81,9 @@ export class Inquiry {
   })
   updatedAt: Date;
 
+  /**
+   * 問い合わせ先施設。
+   */
   @ManyToOne(() => Facility, {
     onDelete: 'RESTRICT',
   })
@@ -79,8 +91,11 @@ export class Inquiry {
     name: 'facility_id',
     referencedColumnName: 'facilityId',
   })
-  facility: Facility;
+  facility: Relation<Facility>;
 
+  /**
+   * 問い合わせ作成者。
+   */
   @ManyToOne(() => User, {
     onDelete: 'RESTRICT',
   })
@@ -88,11 +103,11 @@ export class Inquiry {
     name: 'created_by_user_id',
     referencedColumnName: 'userId',
   })
-  createdByUser: User;
+  createdByUser: Relation<User>;
 
-  @OneToMany(
-  () => InquiryMessage,
-  (message) => message.inquiry,
-)
-messages: InquiryMessage[];
+  /**
+   * 問い合わせに紐づくメッセージ一覧。
+   */
+  @OneToMany(() => InquiryMessage, (message) => message.inquiry)
+  messages: Relation<InquiryMessage[]>;
 }
