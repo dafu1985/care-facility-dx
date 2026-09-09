@@ -15,20 +15,49 @@ import { FacilityStaff } from '../modules/facilities/entities/facility-staff.ent
 import { Inquiry } from '../modules/inquiries/entities/inquiry.entity';
 import { InquiryMessage } from '../modules/inquiries/entities/inquiry-message.entity';
 
+/**
+ * クラウドPostgreSQL用の接続URL。
+ *
+ * DATABASE_URLが設定されている場合は、
+ * NeonなどのクラウドPostgreSQLへ接続する。
+ *
+ * 未設定の場合は、
+ * 従来どおりローカルDocker PostgreSQLへ接続する。
+ */
+const databaseUrl = process.env.DATABASE_URL;
+
 const AppDataSource = new DataSource({
   type: 'postgres',
 
-  host: process.env.DB_HOST,
+  /**
+   * DATABASE_URLが存在する場合は、
+   * URL形式で接続する。
+   */
+  ...(databaseUrl
+    ? {
+        url: databaseUrl,
 
-  port: Number(
-    process.env.DB_PORT ?? 5432,
-  ),
+        /**
+         * NeonなどのクラウドPostgreSQL用。
+         */
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      }
+    : {
+        /**
+         * ローカルDocker PostgreSQL用。
+         */
+        host: process.env.DB_HOST,
 
-  username: process.env.DB_USERNAME,
+        port: Number(process.env.DB_PORT ?? 5432),
 
-  password: process.env.DB_PASSWORD,
+        username: process.env.DB_USERNAME,
 
-  database: process.env.DB_DATABASE,
+        password: process.env.DB_PASSWORD,
+
+        database: process.env.DB_DATABASE,
+      }),
 
   entities: [
     User,
@@ -45,15 +74,14 @@ const AppDataSource = new DataSource({
     InquiryMessage,
   ],
 
-  migrations: [
-    'src/database/migrations/*.ts',
-  ],
+  migrations: ['src/database/migrations/*.ts'],
 
+  /**
+   * DBスキーマはMigrationで管理する。
+   */
   synchronize: false,
 
-  logging:
-    process.env.NODE_ENV ===
-    'development',
+  logging: process.env.NODE_ENV === 'development',
 });
 
 export default AppDataSource;

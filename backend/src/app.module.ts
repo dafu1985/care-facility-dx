@@ -18,21 +18,60 @@ import { AuthModule } from './modules/auth/auth.module';
 
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.getOrThrow<string>('DB_HOST'),
-        port: configService.getOrThrow<number>('DB_PORT'),
-        username: configService.getOrThrow<string>('DB_USERNAME'),
-        password: configService.getOrThrow<string>('DB_PASSWORD'),
-        database: configService.getOrThrow<string>('DB_DATABASE'),
 
-        autoLoadEntities: true,
+      useFactory: (configService: ConfigService) => {
+        /**
+         * Vercel / NeonではDATABASE_URLを使用する。
+         *
+         * ローカル開発では従来どおり
+         * DB_HOST等の個別設定も利用可能にする。
+         */
+        const databaseUrl = configService.get<string>('DATABASE_URL');
 
-        // DBスキーマはMigrationで管理する
-        synchronize: false,
-      }),
+        if (databaseUrl) {
+          return {
+            type: 'postgres' as const,
+
+            url: databaseUrl,
+
+            /**
+             * Neon接続ではSSLを使用する。
+             */
+            ssl: {
+              rejectUnauthorized: false,
+            },
+
+            autoLoadEntities: true,
+
+            /**
+             * DBスキーマはMigrationで管理する。
+             */
+            synchronize: false,
+          };
+        }
+
+        /**
+         * ローカルDocker PostgreSQL用。
+         */
+        return {
+          type: 'postgres' as const,
+
+          host: configService.getOrThrow<string>('DB_HOST'),
+
+          port: configService.getOrThrow<number>('DB_PORT'),
+
+          username: configService.getOrThrow<string>('DB_USERNAME'),
+
+          password: configService.getOrThrow<string>('DB_PASSWORD'),
+
+          database: configService.getOrThrow<string>('DB_DATABASE'),
+
+          autoLoadEntities: true,
+
+          synchronize: false,
+        };
+      },
     }),
-
     UsersModule,
     CareManagersModule,
     FacilitiesModule,
@@ -41,6 +80,7 @@ import { AuthModule } from './modules/auth/auth.module';
   ],
 
   controllers: [AppController],
+
   providers: [AppService],
 })
 export class AppModule {}

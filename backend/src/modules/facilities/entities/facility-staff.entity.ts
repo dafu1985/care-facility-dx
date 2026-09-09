@@ -25,16 +25,9 @@ export enum FacilityStaffStatus {
 @Entity({
   name: 'facility_staff',
 })
-@Index(
-  'UQ_facility_staff_user_facility',
-  [
-    'userId',
-    'facilityId',
-  ],
-  {
-    unique: true,
-  },
-)
+@Index('UQ_facility_staff_user_facility', ['userId', 'facilityId'], {
+  unique: true,
+})
 export class FacilityStaff {
   @PrimaryGeneratedColumn('uuid', {
     name: 'facility_staff_id',
@@ -79,24 +72,18 @@ export class FacilityStaff {
   })
   updatedAt: Date;
 
-  @ManyToOne(
-    () => User,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => User, {
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({
     name: 'user_id',
     referencedColumnName: 'userId',
   })
   user: User;
 
-  @ManyToOne(
-    () => Facility,
-    {
-      onDelete: 'RESTRICT',
-    },
-  )
+  @ManyToOne(() => Facility, {
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({
     name: 'facility_id',
     referencedColumnName: 'facilityId',
