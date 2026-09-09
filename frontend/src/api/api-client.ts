@@ -3,10 +3,22 @@ import axios from "axios";
 import { getAccessToken } from "../features/auth/utils/token-storage";
 
 /**
- * バックエンドAPI共通クライアント。
+ * Backend APIのBase URL。
+ *
+ * ローカル:
+ * http://localhost:3000/api/v1
+ *
+ * Vercel:
+ * VITE_API_BASE_URLで指定する。
+ */
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000/api/v1";
+
+/**
+ * Backend API共通Client。
  */
 export const apiClient = axios.create({
-  baseURL: "http://localhost:3000/api/v1",
+  baseURL: API_BASE_URL,
 
   headers: {
     "Content-Type": "application/json",
@@ -14,22 +26,15 @@ export const apiClient = axios.create({
 });
 
 /**
- * APIリクエスト時にJWTをAuthorizationヘッダーへ設定する。
+ * APIリクエスト時に保存済みJWTが存在する場合、
+ * Authorizationヘッダーへ自動設定する。
  */
 apiClient.interceptors.request.use((config) => {
   const accessToken = getAccessToken();
 
-  /**
-   * 認証問題の確認用。
-   * JWTそのものはログへ出さない。
-   */
-  console.log("accessToken exists:", Boolean(accessToken));
-
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
-
-  console.log("Authorization exists:", Boolean(config.headers.Authorization));
 
   return config;
 });
