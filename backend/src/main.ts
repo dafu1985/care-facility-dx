@@ -13,27 +13,72 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   /**
-   * Frontendからのアクセスを許可する。
+   * 本番Frontend URL。
    *
-   * ローカル:
-   * http://localhost:5173
-   *
-   * Vercel:
-   * FRONTEND_URLで指定する。
+   * Vercel側のEnvironment Variablesで
+   * FRONTEND_URLを設定する。
    */
-  const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+  const frontendUrl = process.env.FRONTEND_URL;
 
   /**
-   * フロントエンドからのAPIアクセスを許可する。
+   * FrontendからのAPIアクセスを許可する。
    *
-   * ローカル開発:
-   * http://localhost:5173
-   *
-   * 本番:
-   * FRONTEND_URL にVercelのFrontend URLを設定する。
+   * 許可対象:
+   * - ローカルFrontend
+   * - FRONTEND_URLで指定した本番Frontend
+   * - Care Facility DXのVercel Preview URL
    */
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      /**
+       * Originが無い通信。
+       */
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      /**
+       * ローカル開発環境。
+       */
+      if (origin === 'http://localhost:5173') {
+        callback(null, true);
+        return;
+      }
+
+      /**
+       * FRONTEND_URLで指定したFrontend。
+       */
+      if (frontendUrl && origin === frontendUrl) {
+        callback(null, true);
+        return;
+      }
+
+      /**
+       * Vercel Preview Deployment。
+       */
+      const isVercelPreview =
+        /^https:\/\/care-facility-dx-ayb7-[a-zA-Z0-9-]+-farmsearchnave-projects\.vercel\.app$/.test(
+          origin,
+        );
+
+      if (isVercelPreview) {
+        callback(null, true);
+        return;
+      }
+
+      /**
+       * 許可対象外。
+       */
+      callback(new Error(`CORS blocked: ${origin}`), false);
+    },
+
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   /**
