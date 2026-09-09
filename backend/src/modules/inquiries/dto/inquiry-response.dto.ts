@@ -1,7 +1,4 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class InquiryMessageResponseDto {
   @ApiProperty({
@@ -194,6 +191,12 @@ export class InquiryListItemResponseDto {
     example: '2026-09-07T08:06:08.283Z',
   })
   updatedAt: Date;
+
+  @ApiProperty({
+    description: '問い合わせ先施設名',
+    example: 'ハタケヤマ介護ホーム新潟',
+  })
+  facilityName: string;
 }
 
 export class InquiryListResponseDto {

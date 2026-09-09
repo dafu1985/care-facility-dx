@@ -37,11 +37,18 @@ type MockInquiryQueryBuilder = {
  * findAll() 用QueryBuilderのテスト用型。
  */
 type MockInquiryListQueryBuilder = {
+  leftJoinAndSelect: ReturnType<typeof jest.fn>;
+
   andWhere: ReturnType<typeof jest.fn>;
+
   orderBy: ReturnType<typeof jest.fn>;
+
   addOrderBy: ReturnType<typeof jest.fn>;
+
   skip: ReturnType<typeof jest.fn>;
+
   take: ReturnType<typeof jest.fn>;
+
   getManyAndCount: ReturnType<typeof jest.fn>;
 };
 
@@ -262,6 +269,8 @@ describe('InquiriesService authorization', () => {
     total: number,
   ): MockInquiryListQueryBuilder => {
     const queryBuilder = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+
       andWhere: jest.fn().mockReturnThis(),
 
       orderBy: jest.fn().mockReturnThis(),
@@ -495,6 +504,36 @@ describe('InquiriesService authorization', () => {
       );
 
       expect(result.total).toBe(1);
+    });
+
+    it('問い合わせ一覧に施設名を返す', async () => {
+      const inquiryWithFacility: Inquiry = {
+        ...ownInquiry,
+
+        facility: {
+          facilityId: ownInquiry.facilityId,
+
+          name: 'ハタケヤマ介護ホーム新潟',
+        } as never,
+      };
+
+      mockFindAllQueryBuilder([inquiryWithFacility], 1);
+
+      const result = await service.findAll(
+        {
+          page: 1,
+          pageSize: 20,
+        },
+        adminUser,
+      );
+
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          facilityId: ownInquiry.facilityId,
+
+          facilityName: 'ハタケヤマ介護ホーム新潟',
+        }),
+      );
     });
   });
 

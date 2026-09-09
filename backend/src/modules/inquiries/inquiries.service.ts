@@ -103,7 +103,9 @@ export class InquiriesService {
   ): Promise<InquiryListResponseDto> {
     const inquiryRepository = this.dataSource.getRepository(Inquiry);
 
-    const queryBuilder = inquiryRepository.createQueryBuilder('inquiry');
+    const queryBuilder = inquiryRepository
+      .createQueryBuilder('inquiry')
+      .leftJoinAndSelect('inquiry.facility', 'facility');
 
     // ケアマネは自分の問い合わせのみ
     if (user.role === UserRole.CARE_MANAGER) {
@@ -194,6 +196,7 @@ export class InquiriesService {
 
     const inquiry = await inquiryRepository
       .createQueryBuilder('inquiry')
+      .leftJoinAndSelect('inquiry.facility', 'facility')
       .leftJoinAndSelect('inquiry.messages', 'message')
       .where('inquiry.inquiryId = :inquiryId', {
         inquiryId,
