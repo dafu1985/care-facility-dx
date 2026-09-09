@@ -5,6 +5,9 @@ import { getMe } from "../api/get-me";
 import type { AuthMeResponse } from "../types/auth";
 
 import { FacilityDashboardPage } from "../../facilities/pages/FacilityDashboardPage";
+import { Button } from "@mui/material";
+
+import { removeAccessToken } from "../utils/token-storage";
 
 /**
  * ログイン後のホーム画面。
@@ -32,6 +35,17 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * ログアウト処理。
+   */
+  const handleLogout = () => {
+    removeAccessToken();
+
+    navigate("/login", {
+      replace: true,
+    });
+  };
 
   /**
    * ログイン中のユーザー情報を取得する。
@@ -141,6 +155,10 @@ export function HomePage() {
         <h2>ケアマネジャーメニュー</h2>
 
         <p>施設検索や問い合わせ確認を行えます。</p>
+
+        <Button variant="outlined" onClick={handleLogout}>
+          ログアウト
+        </Button>
 
         <div
           style={{
