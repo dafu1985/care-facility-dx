@@ -68,6 +68,13 @@ export interface InquiryListItem {
 
   facilityId: string;
 
+  /**
+   * 問い合わせ先施設名。
+   *
+   * BackendのInquiryListItemResponseDtoに対応する。
+   */
+  facilityName: string;
+
   createdByUserId: string;
 
   subject: string;

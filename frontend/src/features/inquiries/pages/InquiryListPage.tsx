@@ -74,6 +74,7 @@ function InquiryCard({ inquiry }: { inquiry: InquiryListItem }) {
       >
         <CardContent>
           <Stack spacing={1.5}>
+            {/* 件名・ステータス */}
             <Box
               sx={{
                 display: "flex",
@@ -95,6 +96,13 @@ function InquiryCard({ inquiry }: { inquiry: InquiryListItem }) {
               <Chip label={getStatusLabel(inquiry.status)} size="small" />
             </Box>
 
+            {/* 問い合わせ先施設 */}
+            <Typography variant="body2" color="text.secondary">
+              問い合わせ先：
+              {inquiry.facilityName}
+            </Typography>
+
+            {/* 最終更新 */}
             <Typography variant="body2" color="text.secondary">
               最終更新：
               {formatDateTime(inquiry.lastMessageAt ?? inquiry.updatedAt)}
@@ -109,9 +117,15 @@ function InquiryCard({ inquiry }: { inquiry: InquiryListItem }) {
 /**
  * 問い合わせ一覧画面。
  *
- * FACILITYユーザーの場合、
- * Backend側で自施設の問い合わせだけに
+ * CARE_MANAGER:
+ * 自分が作成した問い合わせのみ。
+ *
+ * FACILITY:
+ * Backend側で自施設宛の問い合わせだけに
  * 絞り込まれる。
+ *
+ * ADMIN:
+ * 権限に応じて問い合わせ一覧を取得する。
  */
 export function InquiryListPage() {
   /**
@@ -125,6 +139,9 @@ export function InquiryListPage() {
 
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * 問い合わせ一覧を取得する。
+   */
   useEffect(() => {
     let cancelled = false;
 
@@ -154,6 +171,10 @@ export function InquiryListPage() {
         setIsLoading(false);
       });
 
+    /**
+     * コンポーネント破棄後に
+     * state更新を行わないようにする。
+     */
     return () => {
       cancelled = true;
     };
@@ -219,7 +240,7 @@ export function InquiryListPage() {
       <Stack spacing={3}>
         {/* 画面ヘッダー */}
         <Box>
-          {/* 施設ダッシュボードへ戻る */}
+          {/* ホームへ戻る */}
           <Button
             variant="text"
             onClick={() => {
@@ -229,7 +250,7 @@ export function InquiryListPage() {
               mb: 2,
             }}
           >
-            ← ダッシュボードへ戻る
+            ← ホームへ戻る
           </Button>
 
           <Typography variant="h4" component="h1" gutterBottom>
