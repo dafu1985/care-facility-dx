@@ -3,10 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  DataSource,
-  EntityManager,
-} from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import {
@@ -25,10 +22,7 @@ import {
   InquiryMessageResponseDto,
   InquiryResponseDto,
 } from './dto/inquiry-response.dto';
-import {
-  Inquiry,
-  InquiryStatus,
-} from './entities/inquiry.entity';
+import { Inquiry, InquiryStatus } from './entities/inquiry.entity';
 import {
   InquiryMessage,
   InquiryMessageType,
@@ -37,9 +31,7 @@ import { InquiryMapper } from './inquiry.mapper';
 
 @Injectable()
 export class InquiriesService {
-  constructor(
-    private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   /**
    * 問い合わせ作成
@@ -57,54 +49,40 @@ export class InquiriesService {
     dto: CreateInquiryDto,
     user: AuthenticatedUser,
   ): Promise<CreateInquiryResponseDto> {
-    if (
-      user.role !== UserRole.CARE_MANAGER &&
-      user.role !== UserRole.ADMIN
-    ) {
-      throw new ForbiddenException(
-        'You are not allowed to create inquiries',
-      );
+    if (user.role !== UserRole.CARE_MANAGER && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('You are not allowed to create inquiries');
     }
 
-    const savedInquiry =
-      await this.dataSource.transaction(
-        async (manager) => {
-          const inquiryRepository =
-            manager.getRepository(Inquiry);
+    const savedInquiry = await this.dataSource.transaction(async (manager) => {
+      const inquiryRepository = manager.getRepository(Inquiry);
 
-          const messageRepository =
-            manager.getRepository(InquiryMessage);
+      const messageRepository = manager.getRepository(InquiryMessage);
 
-          const now = new Date();
+      const now = new Date();
 
-          const inquiry = inquiryRepository.create({
-            facilityId: dto.facilityId,
-            createdByUserId: user.userId,
-            subject: dto.subject,
-            status: InquiryStatus.OPEN,
-            lastMessageAt: now,
-          });
+      const inquiry = inquiryRepository.create({
+        facilityId: dto.facilityId,
+        createdByUserId: user.userId,
+        subject: dto.subject,
+        status: InquiryStatus.OPEN,
+        lastMessageAt: now,
+      });
 
-          const saved =
-            await inquiryRepository.save(inquiry);
+      const saved = await inquiryRepository.save(inquiry);
 
-          const message =
-            messageRepository.create({
-              inquiryId: saved.inquiryId,
-              senderUserId: user.userId,
-              type: InquiryMessageType.MESSAGE,
-              body: dto.body,
-            });
+      const message = messageRepository.create({
+        inquiryId: saved.inquiryId,
+        senderUserId: user.userId,
+        type: InquiryMessageType.MESSAGE,
+        body: dto.body,
+      });
 
-          await messageRepository.save(message);
+      await messageRepository.save(message);
 
-          return saved;
-        },
-      );
+      return saved;
+    });
 
-    return InquiryMapper.toCreateResponse(
-      savedInquiry,
-    );
+    return InquiryMapper.toCreateResponse(savedInquiry);
   }
 
   /**
@@ -123,64 +101,45 @@ export class InquiriesService {
     query: InquirySearchDto,
     user: AuthenticatedUser,
   ): Promise<InquiryListResponseDto> {
-    const inquiryRepository =
-      this.dataSource.getRepository(Inquiry);
+    const inquiryRepository = this.dataSource.getRepository(Inquiry);
 
-    const queryBuilder =
-      inquiryRepository.createQueryBuilder(
-        'inquiry',
-      );
+    const queryBuilder = inquiryRepository.createQueryBuilder('inquiry');
 
     // ケアマネは自分の問い合わせのみ
     if (user.role === UserRole.CARE_MANAGER) {
-      queryBuilder.andWhere(
-        'inquiry.createdByUserId = :createdByUserId',
-        {
-          createdByUserId: user.userId,
-        },
-      );
+      queryBuilder.andWhere('inquiry.createdByUserId = :createdByUserId', {
+        createdByUserId: user.userId,
+      });
     }
 
     // 施設職員は所属施設宛のみ
     else if (user.role === UserRole.FACILITY) {
-      const facilityIds =
-        await this.getActiveFacilityIds(
-          user.userId,
-          this.dataSource.manager,
-        );
+      const facilityIds = await this.getActiveFacilityIds(
+        user.userId,
+        this.dataSource.manager,
+      );
 
       if (facilityIds.length === 0) {
-        throw new ForbiddenException(
-          'No active facility assignment found',
-        );
+        throw new ForbiddenException('No active facility assignment found');
       }
 
-      queryBuilder.andWhere(
-        'inquiry.facilityId IN (:...facilityIds)',
-        {
-          facilityIds,
-        },
-      );
+      queryBuilder.andWhere('inquiry.facilityId IN (:...facilityIds)', {
+        facilityIds,
+      });
     }
 
     // ADMINは任意ユーザーで検索可能
     else if (user.role === UserRole.ADMIN) {
       if (query.createdByUserId) {
-        queryBuilder.andWhere(
-          'inquiry.createdByUserId = :createdByUserId',
-          {
-            createdByUserId:
-              query.createdByUserId,
-          },
-        );
+        queryBuilder.andWhere('inquiry.createdByUserId = :createdByUserId', {
+          createdByUserId: query.createdByUserId,
+        });
       }
     }
 
     // 想定外ロール
     else {
-      throw new ForbiddenException(
-        'You are not allowed to access inquiries',
-      );
+      throw new ForbiddenException('You are not allowed to access inquiries');
     }
 
     /**
@@ -190,56 +149,34 @@ export class InquiriesService {
      * AND条件になるため他施設は取得できない。
      */
     if (query.facilityId) {
-      queryBuilder.andWhere(
-        'inquiry.facilityId = :facilityId',
-        {
-          facilityId: query.facilityId,
-        },
-      );
+      queryBuilder.andWhere('inquiry.facilityId = :facilityId', {
+        facilityId: query.facilityId,
+      });
     }
 
     // ステータス
     if (query.status) {
-      queryBuilder.andWhere(
-        'inquiry.status = :status',
-        {
-          status: query.status,
-        },
-      );
+      queryBuilder.andWhere('inquiry.status = :status', {
+        status: query.status,
+      });
     }
 
     // 最新のやり取り順
     queryBuilder
-      .orderBy(
-        'inquiry.lastMessageAt',
-        'DESC',
-        'NULLS LAST',
-      )
-      .addOrderBy(
-        'inquiry.createdAt',
-        'DESC',
-      )
-      .addOrderBy(
-        'inquiry.inquiryId',
-        'ASC',
-      );
+      .orderBy('inquiry.lastMessageAt', 'DESC', 'NULLS LAST')
+      .addOrderBy('inquiry.createdAt', 'DESC')
+      .addOrderBy('inquiry.inquiryId', 'ASC');
 
     // ページネーション
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 20;
 
-    queryBuilder
-      .skip((page - 1) * pageSize)
-      .take(pageSize);
+    queryBuilder.skip((page - 1) * pageSize).take(pageSize);
 
-    const [inquiries, total] =
-      await queryBuilder.getManyAndCount();
+    const [inquiries, total] = await queryBuilder.getManyAndCount();
 
     return {
-      items:
-        InquiryMapper.toListResponse(
-          inquiries,
-        ),
+      items: InquiryMapper.toListResponse(inquiries),
       page,
       pageSize,
       total,
@@ -253,38 +190,22 @@ export class InquiriesService {
     inquiryId: string,
     user: AuthenticatedUser,
   ): Promise<InquiryResponseDto> {
-    const inquiryRepository =
-      this.dataSource.getRepository(Inquiry);
+    const inquiryRepository = this.dataSource.getRepository(Inquiry);
 
     const inquiry = await inquiryRepository
       .createQueryBuilder('inquiry')
-      .leftJoinAndSelect(
-        'inquiry.messages',
-        'message',
-      )
-      .where(
-        'inquiry.inquiryId = :inquiryId',
-        {
-          inquiryId,
-        },
-      )
-      .orderBy(
-        'message.createdAt',
-        'ASC',
-      )
+      .leftJoinAndSelect('inquiry.messages', 'message')
+      .where('inquiry.inquiryId = :inquiryId', {
+        inquiryId,
+      })
+      .orderBy('message.createdAt', 'ASC')
       .getOne();
 
     if (!inquiry) {
-      throw new NotFoundException(
-        'Inquiry not found',
-      );
+      throw new NotFoundException('Inquiry not found');
     }
 
-    await this.assertInquiryAccess(
-      inquiry,
-      user,
-      this.dataSource.manager,
-    );
+    await this.assertInquiryAccess(inquiry, user, this.dataSource.manager);
 
     return InquiryMapper.toResponse(inquiry);
   }
@@ -297,61 +218,40 @@ export class InquiriesService {
     dto: CreateInquiryMessageDto,
     user: AuthenticatedUser,
   ): Promise<InquiryMessageResponseDto> {
-    const savedMessage =
-      await this.dataSource.transaction(
-        async (manager) => {
-          const inquiryRepository =
-            manager.getRepository(Inquiry);
+    const savedMessage = await this.dataSource.transaction(async (manager) => {
+      const inquiryRepository = manager.getRepository(Inquiry);
 
-          const messageRepository =
-            manager.getRepository(InquiryMessage);
+      const messageRepository = manager.getRepository(InquiryMessage);
 
-          const inquiry =
-            await inquiryRepository.findOne({
-              where: {
-                inquiryId,
-              },
-            });
-
-          if (!inquiry) {
-            throw new NotFoundException(
-              'Inquiry not found',
-            );
-          }
-
-          await this.assertInquiryAccess(
-            inquiry,
-            user,
-            manager,
-          );
-
-          const message =
-            messageRepository.create({
-              inquiryId,
-              senderUserId: user.userId,
-              type: InquiryMessageType.MESSAGE,
-              body: dto.body,
-            });
-
-          const saved =
-            await messageRepository.save(
-              message,
-            );
-
-          inquiry.lastMessageAt =
-            saved.createdAt;
-
-          await inquiryRepository.save(
-            inquiry,
-          );
-
-          return saved;
+      const inquiry = await inquiryRepository.findOne({
+        where: {
+          inquiryId,
         },
-      );
+      });
 
-    return InquiryMapper.toMessageResponse(
-      savedMessage,
-    );
+      if (!inquiry) {
+        throw new NotFoundException('Inquiry not found');
+      }
+
+      await this.assertInquiryAccess(inquiry, user, manager);
+
+      const message = messageRepository.create({
+        inquiryId,
+        senderUserId: user.userId,
+        type: InquiryMessageType.MESSAGE,
+        body: dto.body,
+      });
+
+      const saved = await messageRepository.save(message);
+
+      inquiry.lastMessageAt = saved.createdAt;
+
+      await inquiryRepository.save(inquiry);
+
+      return saved;
+    });
+
+    return InquiryMapper.toMessageResponse(savedMessage);
   }
 
   /**
@@ -362,72 +262,73 @@ export class InquiriesService {
     dto: UpdateInquiryStatusDto,
     user: AuthenticatedUser,
   ): Promise<InquiryResponseDto> {
-    await this.dataSource.transaction(
-      async (manager) => {
-        const inquiryRepository =
-          manager.getRepository(Inquiry);
+    await this.dataSource.transaction(async (manager) => {
+      const inquiryRepository = manager.getRepository(Inquiry);
 
-        const messageRepository =
-          manager.getRepository(InquiryMessage);
+      const messageRepository = manager.getRepository(InquiryMessage);
 
-        const inquiry =
-          await inquiryRepository.findOne({
-            where: {
-              inquiryId,
-            },
-          });
+      const inquiry = await inquiryRepository.findOne({
+        where: {
+          inquiryId,
+        },
+      });
 
-        if (!inquiry) {
-          throw new NotFoundException(
-            'Inquiry not found',
-          );
-        }
+      if (!inquiry) {
+        throw new NotFoundException('Inquiry not found');
+      }
 
-        await this.assertInquiryAccess(
-          inquiry,
-          user,
-          manager,
-        );
+      /**
+       * 問い合わせへのアクセス権を確認する。
+       */
+      await this.assertInquiryAccess(inquiry, user, manager);
 
-        const previousStatus =
-          inquiry.status;
+      /**
+       * 現在と同じステータスが指定された場合は、
+       * Inquiry更新・STATUS_CHANGE履歴作成を行わない。
+       */
+      if (inquiry.status === dto.status) {
+        return;
+      }
 
-        inquiry.status = dto.status;
+      /**
+       * 変更前ステータスを保持する。
+       */
+      const previousStatus = inquiry.status;
 
-        const savedInquiry =
-          await inquiryRepository.save(
-            inquiry,
-          );
+      /**
+       * 問い合わせステータスを更新する。
+       */
+      inquiry.status = dto.status;
 
-        const statusMessage =
-          messageRepository.create({
-            inquiryId,
-            senderUserId: null,
-            type:
-              InquiryMessageType.STATUS_CHANGE,
-            body:
-              `Status changed from ` +
-              `${previousStatus} to ${dto.status}`,
-          });
+      const savedInquiry = await inquiryRepository.save(inquiry);
 
-        const savedMessage =
-          await messageRepository.save(
-            statusMessage,
-          );
+      /**
+       * ステータス変更履歴を作成する。
+       *
+       * SYSTEM扱いのためsenderUserIdはnull。
+       */
+      const statusMessage = messageRepository.create({
+        inquiryId,
+        senderUserId: null,
+        type: InquiryMessageType.STATUS_CHANGE,
+        body: `Status changed from ` + `${previousStatus} to ${dto.status}`,
+      });
 
-        savedInquiry.lastMessageAt =
-          savedMessage.createdAt;
+      const savedMessage = await messageRepository.save(statusMessage);
 
-        await inquiryRepository.save(
-          savedInquiry,
-        );
-      },
-    );
+      /**
+       * ステータス変更も問い合わせ上の
+       * 最終アクティビティとして扱う。
+       */
+      savedInquiry.lastMessageAt = savedMessage.createdAt;
 
-    return this.findOne(
-      inquiryId,
-      user,
-    );
+      await inquiryRepository.save(savedInquiry);
+    });
+
+    /**
+     * 最新状態を詳細レスポンスとして返す。
+     */
+    return this.findOne(inquiryId, user);
   }
 
   /**
@@ -437,22 +338,16 @@ export class InquiriesService {
     userId: string,
     manager: EntityManager,
   ): Promise<string[]> {
-    const facilityStaffRepository =
-      manager.getRepository(FacilityStaff);
+    const facilityStaffRepository = manager.getRepository(FacilityStaff);
 
-    const facilityStaffList =
-      await facilityStaffRepository.find({
-        where: {
-          userId,
-          status:
-            FacilityStaffStatus.ACTIVE,
-        },
-      });
+    const facilityStaffList = await facilityStaffRepository.find({
+      where: {
+        userId,
+        status: FacilityStaffStatus.ACTIVE,
+      },
+    });
 
-    return facilityStaffList.map(
-      (facilityStaff) =>
-        facilityStaff.facilityId,
-    );
+    return facilityStaffList.map((facilityStaff) => facilityStaff.facilityId);
   }
 
   /**
@@ -480,29 +375,22 @@ export class InquiriesService {
     // CARE_MANAGERは自分の問い合わせのみ
     if (
       user.role === UserRole.CARE_MANAGER &&
-      inquiry.createdByUserId ===
-        user.userId
+      inquiry.createdByUserId === user.userId
     ) {
       return;
     }
 
     // FACILITYは所属施設宛のみ
     if (user.role === UserRole.FACILITY) {
-      const facilityStaffRepository =
-        manager.getRepository(
-          FacilityStaff,
-        );
+      const facilityStaffRepository = manager.getRepository(FacilityStaff);
 
-      const facilityStaff =
-        await facilityStaffRepository.findOne({
-          where: {
-            userId: user.userId,
-            facilityId:
-              inquiry.facilityId,
-            status:
-              FacilityStaffStatus.ACTIVE,
-          },
-        });
+      const facilityStaff = await facilityStaffRepository.findOne({
+        where: {
+          userId: user.userId,
+          facilityId: inquiry.facilityId,
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
 
       if (facilityStaff) {
         return;

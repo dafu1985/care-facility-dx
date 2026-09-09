@@ -23,7 +23,10 @@ import { FacilitySearchDto } from './dto/facility-search.dto';
 import { UpdateFacilityAvailabilityDto } from './dto/update-facility-availability.dto';
 import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
 
-import { FacilityAvailability } from './entities/facility-availability.entity';
+import {
+  FacilityAvailability,
+  AvailabilityStatus,
+} from './entities/facility-availability.entity';
 import { FacilityRequirement } from './entities/facility-requirement.entity';
 import {
   FacilityStaff,
@@ -498,6 +501,41 @@ export class FacilitiesService {
 
     if (dto.note !== undefined) {
       availability.note = dto.note;
+    }
+
+    /**
+     * 空き状況と空床数の整合性を保証する。
+     *
+     * FULL:
+     * 空きなしなので0床。
+     *
+     * UNKNOWN:
+     * 状況未確認なので空床数はnull。
+     *
+     * AVAILABLE / FEW:
+     * 1床以上必要。
+     */
+    if (availability.status === AvailabilityStatus.FULL) {
+      availability.availableCount = 0;
+    }
+
+    if (availability.status === AvailabilityStatus.UNKNOWN) {
+      availability.availableCount = null;
+    }
+
+    if (
+      availability.status === AvailabilityStatus.AVAILABLE ||
+      availability.status === AvailabilityStatus.FEW
+    ) {
+      if (
+        availability.availableCount === null ||
+        availability.availableCount === undefined ||
+        availability.availableCount < 1
+      ) {
+        throw new BadRequestException(
+          'availableCount must be at least 1 when status is AVAILABLE or FEW',
+        );
+      }
     }
 
     const saved = await this.facilityAvailabilityRepository.save(availability);

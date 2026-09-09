@@ -677,6 +677,127 @@ describe('FacilitiesService updateAvailability', () => {
     );
   });
 
+  /**
+   * 空き状況と空床数の整合性ルール。
+   */
+  it('FULLに変更した場合はavailableCountが0になる', async () => {
+    const facility = createFacility();
+    const availability = createAvailability();
+
+    facilityRepository.findOne.mockResolvedValue(facility);
+    facilityAvailabilityRepository.findOne.mockResolvedValue({
+      ...availability,
+      status: AvailabilityStatus.AVAILABLE,
+      availableCount: 3,
+    });
+    facilityAvailabilityRepository.save.mockImplementation(
+      async (target: FacilityAvailability) => target,
+    );
+
+    const result = await service.updateAvailability(
+      facility.facilityId,
+      {
+        status: AvailabilityStatus.FULL,
+        availableCount: 3,
+      },
+      adminUser,
+    );
+
+    expect(result.status).toBe(AvailabilityStatus.FULL);
+    expect(result.availableCount).toBe(0);
+
+    expect(facilityAvailabilityRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: AvailabilityStatus.FULL,
+        availableCount: 0,
+      }),
+    );
+  });
+
+  it('UNKNOWNに変更した場合はavailableCountがnullになる', async () => {
+    const facility = createFacility();
+    const availability = createAvailability();
+
+    facilityRepository.findOne.mockResolvedValue(facility);
+    facilityAvailabilityRepository.findOne.mockResolvedValue({
+      ...availability,
+      status: AvailabilityStatus.AVAILABLE,
+      availableCount: 2,
+    });
+    facilityAvailabilityRepository.save.mockImplementation(
+      async (target: FacilityAvailability) => target,
+    );
+
+    const result = await service.updateAvailability(
+      facility.facilityId,
+      {
+        status: AvailabilityStatus.UNKNOWN,
+        availableCount: 2,
+      },
+      adminUser,
+    );
+
+    expect(result.status).toBe(AvailabilityStatus.UNKNOWN);
+    expect(result.availableCount).toBeNull();
+
+    expect(facilityAvailabilityRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: AvailabilityStatus.UNKNOWN,
+        availableCount: null,
+      }),
+    );
+  });
+
+  it('AVAILABLEでavailableCountが0の場合は400になる', async () => {
+    const facility = createFacility();
+    const availability = createAvailability();
+
+    facilityRepository.findOne.mockResolvedValue(facility);
+    facilityAvailabilityRepository.findOne.mockResolvedValue({
+      ...availability,
+      status: AvailabilityStatus.FEW,
+      availableCount: 1,
+    });
+
+    await expect(
+      service.updateAvailability(
+        facility.facilityId,
+        {
+          status: AvailabilityStatus.AVAILABLE,
+          availableCount: 0,
+        },
+        adminUser,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(facilityAvailabilityRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('FEWでavailableCountが0の場合は400になる', async () => {
+    const facility = createFacility();
+    const availability = createAvailability();
+
+    facilityRepository.findOne.mockResolvedValue(facility);
+    facilityAvailabilityRepository.findOne.mockResolvedValue({
+      ...availability,
+      status: AvailabilityStatus.AVAILABLE,
+      availableCount: 2,
+    });
+
+    await expect(
+      service.updateAvailability(
+        facility.facilityId,
+        {
+          status: AvailabilityStatus.FEW,
+          availableCount: 0,
+        },
+        adminUser,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(facilityAvailabilityRepository.save).not.toHaveBeenCalled();
+  });
+
   describe('updateRequirement', () => {
     it('FACILITYは自施設の受入条件を更新できる', async () => {
       const facility = createFacility();
