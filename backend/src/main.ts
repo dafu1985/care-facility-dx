@@ -44,7 +44,10 @@ async function bootstrap() {
       /**
        * ローカル開発環境。
        */
-      if (origin === 'http://localhost:5173') {
+      if (
+        origin === 'http://localhost:5173' ||
+        origin === 'http://localhost:3000'
+      ) {
         callback(null, true);
         return;
       }

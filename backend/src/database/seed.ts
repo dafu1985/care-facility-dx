@@ -37,12 +37,13 @@ import {
 /**
  * Prototype用Seed。
  *
- * 同じメールアドレス・施設名が存在する場合は、
- * 二重登録しない。
+ * 同じメールアドレス・施設名が存在する場合は
+ * 重複登録しない。
  */
 async function seed() {
   /**
-   * パスワードはコードへ直書きしない。
+   * パスワードはコードへ直接記述せず、
+   * 環境変数から取得する。
    */
   const seedPassword = process.env.SEED_PASSWORD;
 
@@ -74,12 +75,12 @@ async function seed() {
     const facilityStaffRepository = AppDataSource.getRepository(FacilityStaff);
 
     /**
-     * Seed用パスワードをbcrypt化。
+     * Seed用パスワードをbcryptでハッシュ化する。
      */
     const passwordHash = await bcrypt.hash(seedPassword, 10);
 
     // ==================================================
-    // CARE_MANAGER
+    // CARE_MANAGER USER
     // ==================================================
 
     let careManagerUser = await userRepository.findOne({
@@ -91,19 +92,31 @@ async function seed() {
     if (!careManagerUser) {
       careManagerUser = userRepository.create({
         role: UserRole.CARE_MANAGER,
-
         email: 'caremanager@example.com',
-
         passwordHash,
-
         status: UserStatus.ACTIVE,
       });
 
-      careManagerUser = await userRepository.save(careManagerUser);
-
       console.log('Created CARE_MANAGER user.');
+    } else {
+      /**
+       * 既存ユーザーの場合も、
+       * Seed時のパスワードへ更新する。
+       */
+      careManagerUser.passwordHash = passwordHash;
+      careManagerUser.status = UserStatus.ACTIVE;
+
+      console.log('Updated CARE_MANAGER password.');
     }
 
+    /**
+     * 新規・既存どちらの場合も保存する。
+     */
+    careManagerUser = await userRepository.save(careManagerUser);
+
+    /**
+     * ケアマネ詳細情報。
+     */
     const existingCareManager = await careManagerRepository.findOne({
       where: {
         userId: careManagerUser.userId,
@@ -125,30 +138,70 @@ async function seed() {
     }
 
     // ==================================================
-    // FACILITY USER
+    // FACILITY USER HELPER
     // ==================================================
 
-    let facilityUser = await userRepository.findOne({
-      where: {
-        email: 'facilitystaff@example.com',
-      },
-    });
-
-    if (!facilityUser) {
-      facilityUser = userRepository.create({
-        role: UserRole.FACILITY,
-
-        email: 'facilitystaff@example.com',
-
-        passwordHash,
-
-        status: UserStatus.ACTIVE,
+    /**
+     * 施設職員ユーザーを
+     * 必要に応じて作成する。
+     */
+    async function createFacilityUserIfNeeded(email: string): Promise<User> {
+      let user = await userRepository.findOne({
+        where: {
+          email,
+        },
       });
 
-      facilityUser = await userRepository.save(facilityUser);
+      if (!user) {
+        user = userRepository.create({
+          role: UserRole.FACILITY,
 
-      console.log('Created FACILITY user.');
+          email,
+
+          passwordHash,
+
+          status: UserStatus.ACTIVE,
+        });
+
+        console.log(`Created FACILITY user: ${email}`);
+      } else {
+        /**
+         * 既存ユーザーの場合も、
+         * Seed時のパスワードへ更新する。
+         */
+        user.role = UserRole.FACILITY;
+        user.passwordHash = passwordHash;
+        user.status = UserStatus.ACTIVE;
+
+        console.log(`Updated FACILITY password: ${email}`);
+      }
+
+      /**
+       * 新規・既存どちらの場合も保存する。
+       */
+      user = await userRepository.save(user);
+
+      return user;
     }
+
+    /**
+     * ハタケヤマ介護ホーム新潟用。
+     */
+    const hatakeyamaUser = await createFacilityUserIfNeeded(
+      'facilitystaff@example.com',
+    );
+
+    /**
+     * 長岡ケアレジデンス用。
+     */
+    const nagaokaUser = await createFacilityUserIfNeeded('nagaoka@example.com');
+
+    /**
+     * 新潟西シニアホーム用。
+     */
+    const niigataNishiUser = await createFacilityUserIfNeeded(
+      'niigatanishi@example.com',
+    );
 
     // ==================================================
     // FACILITY TYPE
@@ -173,15 +226,18 @@ async function seed() {
     }
 
     /**
-     * ここまで来れば施設種別は必ず存在する。
-     *
-     * ネストした関数内でもnullではないことを
-     * TypeScriptに保証するため、別のconstへ代入する。
+     * ここまで到達した時点で
+     * facilityTypeは必ず存在する。
      */
     const seededFacilityType = facilityType;
 
+    // ==================================================
+    // FACILITY HELPER
+    // ==================================================
+
     /**
-     * 施設作成共通処理。
+     * 施設と関連情報を
+     * 必要に応じて作成する。
      */
     async function createFacilityIfNeeded(input: {
       name: string;
@@ -346,6 +402,7 @@ async function seed() {
 
     // ==================================================
     // FACILITY 1
+    // ハタケヤマ介護ホーム新潟
     // ==================================================
 
     const hatakeyamaFacility = await createFacilityIfNeeded({
@@ -398,9 +455,10 @@ async function seed() {
 
     // ==================================================
     // FACILITY 2
+    // 長岡ケアレジデンス更新確認
     // ==================================================
 
-    await createFacilityIfNeeded({
+    const nagaokaFacility = await createFacilityIfNeeded({
       name: '長岡ケアレジデンス更新確認',
 
       postalCode: '940-0000',
@@ -450,9 +508,10 @@ async function seed() {
 
     // ==================================================
     // FACILITY 3
+    // 新潟西シニアホーム
     // ==================================================
 
-    await createFacilityIfNeeded({
+    const niigataNishiFacility = await createFacilityIfNeeded({
       name: '新潟西シニアホーム',
 
       postalCode: '950-2000',
@@ -501,22 +560,35 @@ async function seed() {
     });
 
     // ==================================================
-    // FACILITY STAFF
+    // FACILITY STAFF HELPER
     // ==================================================
 
-    const existingFacilityStaff = await facilityStaffRepository.findOne({
-      where: {
-        userId: facilityUser.userId,
+    /**
+     * 施設職員と施設を紐付ける。
+     *
+     * 既存の紐付けがある場合は
+     * 重複登録しない。
+     */
+    async function createFacilityStaffIfNeeded(
+      user: User,
+      facility: Facility,
+    ): Promise<void> {
+      const existingFacilityStaff = await facilityStaffRepository.findOne({
+        where: {
+          userId: user.userId,
 
-        facilityId: hatakeyamaFacility.facilityId,
-      },
-    });
+          facilityId: facility.facilityId,
+        },
+      });
 
-    if (!existingFacilityStaff) {
+      if (existingFacilityStaff) {
+        return;
+      }
+
       const facilityStaff = facilityStaffRepository.create({
-        userId: facilityUser.userId,
+        userId: user.userId,
 
-        facilityId: hatakeyamaFacility.facilityId,
+        facilityId: facility.facilityId,
 
         role: FacilityStaffRole.MANAGER,
 
@@ -525,15 +597,36 @@ async function seed() {
 
       await facilityStaffRepository.save(facilityStaff);
 
-      console.log('Created FacilityStaff assignment.');
+      console.log(
+        `Created FacilityStaff assignment: ${user.email} -> ${facility.name}`,
+      );
     }
+
+    // ==================================================
+    // FACILITY STAFF ASSIGNMENT
+    // ==================================================
+
+    await createFacilityStaffIfNeeded(hatakeyamaUser, hatakeyamaFacility);
+
+    await createFacilityStaffIfNeeded(nagaokaUser, nagaokaFacility);
+
+    await createFacilityStaffIfNeeded(niigataNishiUser, niigataNishiFacility);
+
+    // ==================================================
+    // COMPLETED
+    // ==================================================
 
     console.log('');
     console.log('Seed completed successfully.');
 
+    console.log('');
     console.log('CARE_MANAGER: caremanager@example.com');
 
-    console.log('FACILITY: facilitystaff@example.com');
+    console.log('HATAKEYAMA FACILITY: facilitystaff@example.com');
+
+    console.log('NAGAOKA FACILITY: nagaoka@example.com');
+
+    console.log('NIIGATA NISHI FACILITY: niigatanishi@example.com');
   } finally {
     await AppDataSource.destroy();
   }
