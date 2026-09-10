@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { getMe } from "../api/get-me";
 import type { AuthMeResponse } from "../types/auth";
 
+import { CareManagerDashboardPage } from "../../care-managers/pages/CareManagerDashboardPage";
 import { FacilityDashboardPage } from "../../facilities/pages/FacilityDashboardPage";
-import { Button } from "@mui/material";
-
-import { removeAccessToken } from "../utils/token-storage";
 
 /**
  * ログイン後のホーム画面。
@@ -19,33 +16,17 @@ import { removeAccessToken } from "../utils/token-storage";
  * 所属施設のダッシュボードを表示する。
  *
  * CARE_MANAGER:
- * ケアマネジャー向けメニューを表示する。
+ * ケアマネジャー向けダッシュボードを表示する。
  *
  * ADMIN:
  * 現時点ではログインユーザー情報を表示する。
  */
 export function HomePage() {
-  /**
-   * React Routerによる画面遷移用。
-   */
-  const navigate = useNavigate();
-
   const [user, setUser] = useState<AuthMeResponse | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
-
-  /**
-   * ログアウト処理。
-   */
-  const handleLogout = () => {
-    removeAccessToken();
-
-    navigate("/login", {
-      replace: true,
-    });
-  };
 
   /**
    * ログイン中のユーザー情報を取得する。
@@ -138,60 +119,14 @@ export function HomePage() {
   /**
    * CARE_MANAGERユーザー。
    *
-   * 施設検索・問い合わせ一覧へ
-   * 遷移できるメニューを表示する。
+   * ケアマネジャー向けダッシュボードを表示する。
    */
   if (user.role === "CARE_MANAGER") {
-    return (
-      <div
-        style={{
-          maxWidth: 800,
-          margin: "0 auto",
-          padding: 32,
-        }}
-      >
-        <h1>Care Facility DX</h1>
-
-        <h2>ケアマネジャーメニュー</h2>
-
-        <p>施設検索や問い合わせ確認を行えます。</p>
-
-        <Button variant="outlined" onClick={handleLogout}>
-          ログアウト
-        </Button>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginTop: 24,
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              navigate("/facilities");
-            }}
-          >
-            施設を検索する
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              navigate("/inquiries");
-            }}
-          >
-            自分の問い合わせを見る
-          </button>
-        </div>
-      </div>
-    );
+    return <CareManagerDashboardPage />;
   }
 
   /**
-   * FACILITYに所属しているはずだが
+   * FACILITYユーザーだが、
    * facilityIdが取得できなかった場合。
    */
   if (user.role === "FACILITY" && !user.facilityId) {
