@@ -3,7 +3,9 @@ import {
   Box,
   Button,
   Card,
+  CardActionArea,
   CardContent,
+  Chip,
   CircularProgress,
   Container,
   Stack,
@@ -17,6 +19,91 @@ import { removeAccessToken } from "../../auth/utils/token-storage";
 import { getCareManagerDashboard } from "../api/get-care-manager-dashboard";
 
 import type { CareManagerDashboardResponse } from "../types/care-manager-dashboard";
+
+/**
+ * 問い合わせステータスを画面表示用の日本語へ変換する。
+ */
+function getInquiryStatusLabel(status: string): string {
+  switch (status) {
+    case "OPEN":
+      return "未対応";
+
+    case "IN_PROGRESS":
+      return "対応中";
+
+    case "ANSWERED":
+      return "回答済み";
+
+    case "CLOSED":
+      return "完了";
+
+    case "CANCELLED":
+      return "キャンセル";
+
+    default:
+      return status;
+  }
+}
+
+/**
+ * 問い合わせステータスに応じたChipの色を返す。
+ */
+function getInquiryStatusColor(
+  status: string,
+):
+  | "default"
+  | "primary"
+  | "secondary"
+  | "error"
+  | "info"
+  | "success"
+  | "warning" {
+  switch (status) {
+    case "OPEN":
+      return "warning";
+
+    case "IN_PROGRESS":
+      return "info";
+
+    case "ANSWERED":
+      return "success";
+
+    case "CLOSED":
+      return "default";
+
+    case "CANCELLED":
+      return "error";
+
+    default:
+      return "default";
+  }
+}
+
+/**
+ * ISO形式の日時を日本向けの日時表示へ変換する。
+ *
+ * @param value ISO形式の日時文字列
+ * @returns 日本向けに整形した日時
+ */
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "未更新";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "日時不明";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 /**
  * ケアマネジャー向けダッシュボード画面。
@@ -225,26 +312,38 @@ export function CareManagerDashboardPage() {
                 mt: 2,
               }}
             >
+              {/* 全問い合わせ */}
               <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    全問い合わせ
-                  </Typography>
-
-                  <Typography variant="h4">
-                    {inquirySummary.totalCount}
-                    <Typography
-                      component="span"
-                      sx={{
-                        ml: 0.5,
-                      }}
-                    >
-                      件
+                <CardActionArea
+                  onClick={() => {
+                    navigate("/inquiries");
+                  }}
+                  sx={{
+                    height: "100%",
+                  }}
+                >
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom>
+                      全問い合わせ
                     </Typography>
-                  </Typography>
-                </CardContent>
+
+                    <Typography variant="h4">
+                      {inquirySummary.totalCount}
+
+                      <Typography
+                        component="span"
+                        sx={{
+                          ml: 0.5,
+                        }}
+                      >
+                        件
+                      </Typography>
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
               </Card>
 
+              {/* 対応中 */}
               <Card variant="outlined">
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -253,6 +352,7 @@ export function CareManagerDashboardPage() {
 
                   <Typography variant="h4">
                     {inquirySummary.openCount}
+
                     <Typography
                       component="span"
                       sx={{
@@ -265,6 +365,7 @@ export function CareManagerDashboardPage() {
                 </CardContent>
               </Card>
 
+              {/* 回答済み */}
               <Card variant="outlined">
                 <CardContent>
                   <Typography color="text.secondary" gutterBottom>
@@ -273,6 +374,7 @@ export function CareManagerDashboardPage() {
 
                   <Typography variant="h4">
                     {inquirySummary.answeredCount}
+
                     <Typography
                       component="span"
                       sx={{
@@ -316,13 +418,38 @@ export function CareManagerDashboardPage() {
                 {inquirySummary.recentInquiries.map((inquiry) => (
                   <Box
                     key={inquiry.inquiryId}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      navigate(`/inquiries/${inquiry.inquiryId}`);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+
+                        navigate(`/inquiries/${inquiry.inquiryId}`);
+                      }
+                    }}
                     sx={{
                       p: 2,
                       border: 1,
                       borderColor: "divider",
                       borderRadius: 1,
+                      cursor: "pointer",
+                      transition:
+                        "background-color 0.2s ease, border-color 0.2s ease",
+                      "&:hover": {
+                        backgroundColor: "action.hover",
+                        borderColor: "primary.main",
+                      },
+                      "&:focus-visible": {
+                        outline: "2px solid",
+                        outlineColor: "primary.main",
+                        outlineOffset: 2,
+                      },
                     }}
                   >
+                    {/* 件名 */}
                     <Typography
                       sx={{
                         fontWeight: 700,
@@ -331,27 +458,50 @@ export function CareManagerDashboardPage() {
                       {inquiry.subject}
                     </Typography>
 
-                    <Typography variant="body2" color="text.secondary">
+                    {/* 施設名 */}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 0.5,
+                      }}
+                    >
                       施設：
                       {inquiry.facilityName}
                     </Typography>
 
-                    <Typography variant="body2" color="text.secondary">
-                      ステータス：
-                      {inquiry.status}
+                    {/* 最終更新日時 */}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{
+                        mt: 0.5,
+                      }}
+                    >
+                      最終更新：
+                      {formatDateTime(inquiry.lastMessageAt)}
                     </Typography>
 
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        navigate(`/inquiries/${inquiry.inquiryId}`);
-                      }}
+                    {/* ステータス */}
+                    <Box
                       sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 1,
                         mt: 1,
                       }}
                     >
-                      詳細を見る
-                    </Button>
+                      <Typography variant="body2" color="text.secondary">
+                        ステータス：
+                      </Typography>
+
+                      <Chip
+                        label={getInquiryStatusLabel(inquiry.status)}
+                        color={getInquiryStatusColor(inquiry.status)}
+                        size="small"
+                      />
+                    </Box>
                   </Box>
                 ))}
               </Stack>

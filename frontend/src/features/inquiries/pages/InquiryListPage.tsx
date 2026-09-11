@@ -11,8 +11,8 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { getInquiries } from "../api/get-inquiries";
 import type {
@@ -47,6 +47,40 @@ function getStatusLabel(status: InquiryStatus): string {
 }
 
 /**
+ * 問い合わせステータスに応じたChip色を返す。
+ */
+function getStatusColor(
+  status: InquiryStatus,
+):
+  | "default"
+  | "primary"
+  | "secondary"
+  | "error"
+  | "info"
+  | "success"
+  | "warning" {
+  switch (status) {
+    case "OPEN":
+      return "warning";
+
+    case "IN_PROGRESS":
+      return "info";
+
+    case "ANSWERED":
+      return "success";
+
+    case "CLOSED":
+      return "default";
+
+    case "CANCELLED":
+      return "error";
+
+    default:
+      return "default";
+  }
+}
+
+/**
  * 日時を日本向けの表示形式へ変換する。
  */
 function formatDateTime(dateTime: string | null): string {
@@ -56,7 +90,66 @@ function formatDateTime(dateTime: string | null): string {
 
   const date = new Date(dateTime);
 
-  return date.toLocaleString("ja-JP");
+  if (Number.isNaN(date.getTime())) {
+    return "日時不明";
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/**
+ * URLから問い合わせステータスを取得する。
+ *
+ * 例:
+ * /inquiries?status=OPEN,IN_PROGRESS
+ */
+function parseStatuses(value: string | null): InquiryStatus[] {
+  if (!value) {
+    return [];
+  }
+
+  const validStatuses: InquiryStatus[] = [
+    "OPEN",
+    "IN_PROGRESS",
+    "ANSWERED",
+    "CLOSED",
+    "CANCELLED",
+  ];
+
+  return value
+    .split(",")
+    .filter((status): status is InquiryStatus =>
+      validStatuses.includes(status as InquiryStatus),
+    );
+}
+
+/**
+ * 現在の絞り込み条件を画面表示用の文言へ変換する。
+ */
+function getFilterLabel(statuses: InquiryStatus[]): string {
+  if (statuses.length === 0) {
+    return "すべて";
+  }
+
+  if (
+    statuses.length === 2 &&
+    statuses.includes("OPEN") &&
+    statuses.includes("IN_PROGRESS")
+  ) {
+    return "対応中";
+  }
+
+  if (statuses.length === 1) {
+    return getStatusLabel(statuses[0]);
+  }
+
+  return statuses.map(getStatusLabel).join("・");
 }
 
 /**
@@ -93,7 +186,11 @@ function InquiryCard({ inquiry }: { inquiry: InquiryListItem }) {
                 {inquiry.subject}
               </Typography>
 
-              <Chip label={getStatusLabel(inquiry.status)} size="small" />
+              <Chip
+                label={getStatusLabel(inquiry.status)}
+                color={getStatusColor(inquiry.status)}
+                size="small"
+              />
             </Box>
 
             {/* 問い合わせ先施設 */}
@@ -133,11 +230,43 @@ export function InquiryListPage() {
    */
   const navigate = useNavigate();
 
+  /**
+   * URLクエリパラメータ。
+   */
+  const [searchParams] = useSearchParams();
+
   const [response, setResponse] = useState<InquiryListResponse | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * URLのstatusパラメータから
+   * 絞り込み対象ステータスを取得する。
+   */
+  const selectedStatuses = useMemo(
+    () => parseStatuses(searchParams.get("status")),
+    [searchParams],
+  );
+
+  /**
+   * APIから取得した問い合わせを
+   * URLクエリに応じて画面側で絞り込む。
+   */
+  const filteredItems = useMemo(() => {
+    if (!response) {
+      return [];
+    }
+
+    if (selectedStatuses.length === 0) {
+      return response.items;
+    }
+
+    return response.items.filter((inquiry) =>
+      selectedStatuses.includes(inquiry.status),
+    );
+  }, [response, selectedStatuses]);
 
   /**
    * 問い合わせ一覧を取得する。
@@ -257,15 +386,43 @@ export function InquiryListPage() {
             問い合わせ一覧
           </Typography>
 
-          <Typography color="text.secondary">全{response.total}件</Typography>
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+            }}
+          >
+            <Typography color="text.secondary">
+              {filteredItems.length}件
+            </Typography>
+
+            <Chip
+              label={`表示：${getFilterLabel(selectedStatuses)}`}
+              size="small"
+              variant="outlined"
+            />
+
+            {selectedStatuses.length > 0 && (
+              <Button
+                size="small"
+                onClick={() => {
+                  navigate("/inquiries");
+                }}
+              >
+                絞り込み解除
+              </Button>
+            )}
+          </Stack>
         </Box>
 
         {/* 問い合わせ一覧 */}
-        {response.items.length === 0 ? (
-          <Alert severity="info">問い合わせはありません。</Alert>
+        {filteredItems.length === 0 ? (
+          <Alert severity="info">条件に一致する問い合わせはありません。</Alert>
         ) : (
           <Stack spacing={2}>
-            {response.items.map((inquiry) => (
+            {filteredItems.map((inquiry) => (
               <InquiryCard key={inquiry.inquiryId} inquiry={inquiry} />
             ))}
           </Stack>
