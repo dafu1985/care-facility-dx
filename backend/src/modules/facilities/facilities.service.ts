@@ -43,6 +43,9 @@ import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 import { FacilityPricingResponseDto } from './dto/facility-pricing-response.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { FacilityDashboardResponseDto } from './dto/facility-dashboard-response.dto';
+import { FacilityMedicalCapability } from './entities/facility-medical-capability.entity';
+import { MedicalConditionMaster } from '../medical-conditions/entities/medical-condition-master.entity';
+import { ReplaceMedicalCapabilitiesDto } from './dto/replace-medical-capabilities.dto';
 
 @Injectable()
 export class FacilitiesService {
@@ -64,6 +67,12 @@ export class FacilitiesService {
 
     @InjectRepository(Inquiry)
     private readonly inquiryRepository: Repository<Inquiry>,
+
+    @InjectRepository(FacilityMedicalCapability)
+    private readonly facilityMedicalCapabilityRepository: Repository<FacilityMedicalCapability>,
+
+    @InjectRepository(MedicalConditionMaster)
+    private readonly medicalConditionRepository: Repository<MedicalConditionMaster>,
   ) {}
 
   /**
@@ -495,6 +504,18 @@ export class FacilitiesService {
       availability.availableCount = dto.availableCount;
     }
 
+    if (dto.maleVacancy !== undefined) {
+      availability.maleVacancy = dto.maleVacancy;
+    }
+
+    if (dto.femaleVacancy !== undefined) {
+      availability.femaleVacancy = dto.femaleVacancy;
+    }
+
+    if (dto.privateRoomVacancy !== undefined) {
+      availability.privateRoomVacancy = dto.privateRoomVacancy;
+    }
+
     if (dto.availableFrom !== undefined) {
       availability.availableFrom = dto.availableFrom;
     }
@@ -516,11 +537,22 @@ export class FacilitiesService {
      * 1床以上必要。
      */
     if (availability.status === AvailabilityStatus.FULL) {
+      // 満床の場合、すべての空床数を0に統一する。
       availability.availableCount = 0;
+      availability.maleVacancy = 0;
+      availability.femaleVacancy = 0;
+      availability.privateRoomVacancy = 0;
     }
 
-    if (availability.status === AvailabilityStatus.UNKNOWN) {
+    if (
+      availability.status === AvailabilityStatus.UNKNOWN ||
+      availability.status === AvailabilityStatus.SUSPENDED
+    ) {
+      // 空床数を確定できない状態なので、内訳も含めてnullに統一する。
       availability.availableCount = null;
+      availability.maleVacancy = null;
+      availability.femaleVacancy = null;
+      availability.privateRoomVacancy = null;
     }
 
     if (
@@ -538,21 +570,33 @@ export class FacilitiesService {
       }
     }
 
+    if (
+      availability.status === AvailabilityStatus.CONSULTATION &&
+      availability.availableCount !== null &&
+      availability.availableCount !== undefined &&
+      availability.availableCount < 0
+    ) {
+      throw new BadRequestException(
+        'availableCount must be 0 or greater when status is CONSULTATION',
+      );
+    }
+
+    // 空床情報を最後に更新したユーザーを記録する。
+    availability.updatedBy = user.userId;
+
     const saved = await this.facilityAvailabilityRepository.save(availability);
 
     return {
       availabilityId: saved.availabilityId,
-
       facilityId: saved.facilityId,
-
       status: saved.status,
-
       availableCount: saved.availableCount,
-
+      maleVacancy: saved.maleVacancy,
+      femaleVacancy: saved.femaleVacancy,
+      privateRoomVacancy: saved.privateRoomVacancy,
       availableFrom: saved.availableFrom,
-
       note: saved.note,
-
+      updatedBy: saved.updatedBy,
       updatedAt: saved.updatedAt,
     };
   }
@@ -765,6 +809,94 @@ export class FacilitiesService {
     };
   }
 
+  async replaceMedicalCapabilities(
+    facilityId: string,
+    dto: ReplaceMedicalCapabilitiesDto,
+    user: AuthenticatedUser,
+  ): Promise<FacilityMedicalCapability[]> {
+    // 施設存在確認
+    const facility = await this.facilityRepository.findOne({
+      where: { facilityId },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    // 更新権限確認
+    await this.assertFacilityUpdateAccess(
+      facilityId,
+      user,
+      'medicalCapability',
+    );
+
+    const codes = dto.capabilities.map((capability) => capability.code);
+
+    // 有効な医療条件マスタのみ取得
+    const masters = await this.medicalConditionRepository.find({
+      where: {
+        code: In(codes),
+        isActive: true,
+      },
+    });
+
+    // 指定されたコードがすべて存在するか確認
+    if (masters.length !== codes.length) {
+      throw new NotFoundException('存在しない医療条件が含まれています。');
+    }
+
+    const masterMap = new Map(masters.map((master) => [master.code, master]));
+
+    // 既存の施設医療対応能力を全削除
+    await this.facilityMedicalCapabilityRepository.delete({
+      facilityId,
+    });
+
+    // 新しい設定を作成
+    const capabilities = dto.capabilities.map((item) =>
+      this.facilityMedicalCapabilityRepository.create({
+        facilityId,
+        medicalConditionId: masterMap.get(item.code)!.medicalConditionId,
+        status: item.status,
+        note: item.note ?? null,
+      }),
+    );
+
+    return this.facilityMedicalCapabilityRepository.save(capabilities);
+  }
+
+  /**
+   * 施設の医療対応能力を取得する。
+   *
+   * 医療条件マスタもRelationとして取得し、
+   * code・nameなどをレスポンスに含める。
+   */
+  async getMedicalCapabilities(
+    facilityId: string,
+  ): Promise<FacilityMedicalCapability[]> {
+    // 施設存在確認
+    const facility = await this.facilityRepository.findOne({
+      where: { facilityId },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    // 医療条件マスタも含めて取得
+    return this.facilityMedicalCapabilityRepository.find({
+      where: {
+        facilityId,
+      },
+      relations: {
+        medicalCondition: true,
+      },
+      order: {
+        createdAt: 'ASC',
+      },
+    });
+  }
+
   /**
    * 施設更新系API共通の認可処理。
    *
@@ -780,7 +912,12 @@ export class FacilitiesService {
   private async assertFacilityUpdateAccess(
     facilityId: string,
     user: AuthenticatedUser,
-    resource: 'availability' | 'requirement' | 'pricing' | 'facility',
+    resource:
+      | 'availability'
+      | 'requirement'
+      | 'pricing'
+      | 'facility'
+      | 'medicalCapability',
   ): Promise<void> {
     /**
      * ADMINは所属確認不要。
@@ -828,6 +965,12 @@ export class FacilitiesService {
     if (resource === 'pricing') {
       throw new ForbiddenException(
         'You are not allowed to update facility pricing',
+      );
+    }
+
+    if (resource === 'medicalCapability') {
+      throw new ForbiddenException(
+        'You are not allowed to update facility medical capabilities',
       );
     }
 

@@ -32,6 +32,36 @@ export class UpdateFacilityAvailabilityDto {
   availableCount?: number | null;
 
   @ApiPropertyOptional({
+    description: '男性向け空床数',
+    example: 1,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maleVacancy?: number | null;
+
+  @ApiPropertyOptional({
+    description: '女性向け空床数',
+    example: 1,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  femaleVacancy?: number | null;
+
+  @ApiPropertyOptional({
+    description: '個室の空床数',
+    example: 1,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  privateRoomVacancy?: number | null;
+
+  @ApiPropertyOptional({
     description: '受け入れ可能日',
     example: '2026-09-15',
     nullable: true,

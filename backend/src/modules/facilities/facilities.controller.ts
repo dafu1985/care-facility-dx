@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Put,
   ParseUUIDPipe,
   Patch,
   Query,
@@ -42,6 +43,7 @@ import { UpdateFacilityPricingDto } from './dto/update-facility-pricing.dto';
 import { UpdateFacilityRequirementDto } from './dto/update-facility-requirement.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { FacilityDashboardResponseDto } from './dto/facility-dashboard-response.dto';
+import { ReplaceMedicalCapabilitiesDto } from './dto/replace-medical-capabilities.dto';
 
 @ApiTags('facilities')
 @Controller('facilities')
@@ -343,5 +345,52 @@ export class FacilitiesController {
     user: AuthenticatedUser,
   ): Promise<FacilityPricingResponseDto> {
     return this.facilitiesService.updatePricing(facilityId, dto, user);
+  }
+
+  @Put(':facilityId/medical-capabilities')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.FACILITY, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '施設の医療対応能力を登録・更新する',
+    description:
+      '施設職員は自施設、管理者は任意施設の医療対応能力を全置換します。',
+  })
+  @ApiParam({
+    name: 'facilityId',
+    description: '施設ID',
+  })
+  async replaceMedicalCapabilities(
+    @Param('facilityId', new ParseUUIDPipe())
+    facilityId: string,
+
+    @Body()
+    dto: ReplaceMedicalCapabilitiesDto,
+
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ) {
+    return this.facilitiesService.replaceMedicalCapabilities(
+      facilityId,
+      dto,
+      user,
+    );
+  }
+
+  @Get(':facilityId/medical-capabilities')
+  @ApiOperation({
+    summary: '施設の医療対応能力を取得する',
+    description:
+      '施設に登録されている医療対応能力を医療条件マスタ情報とともに取得します。',
+  })
+  @ApiParam({
+    name: 'facilityId',
+    description: '施設ID',
+  })
+  async getMedicalCapabilities(
+    @Param('facilityId', new ParseUUIDPipe())
+    facilityId: string,
+  ) {
+    return this.facilitiesService.getMedicalCapabilities(facilityId);
   }
 }

@@ -13,6 +13,8 @@ import { FacilityRequirement } from './entities/facility-requirement.entity';
 import { FacilityStaff } from './entities/facility-staff.entity';
 import { FacilityType } from './entities/facility-type.entity';
 import { Facility } from './entities/facility.entity';
+import { FacilityMedicalCapability } from './entities/facility-medical-capability.entity';
+import { MedicalConditionMaster } from '../medical-conditions/entities/medical-condition-master.entity';
 
 @Module({
   imports: [
@@ -36,6 +38,8 @@ import { Facility } from './entities/facility.entity';
       FacilityPricing,
       FacilityRequirement,
       FacilityStaff,
+      FacilityMedicalCapability,
+      MedicalConditionMaster,
       Inquiry,
     ]),
   ],

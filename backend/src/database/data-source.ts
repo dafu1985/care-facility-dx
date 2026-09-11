@@ -14,6 +14,14 @@ import { FacilityStaff } from '../modules/facilities/entities/facility-staff.ent
 
 import { Inquiry } from '../modules/inquiries/entities/inquiry.entity';
 import { InquiryMessage } from '../modules/inquiries/entities/inquiry-message.entity';
+import { Organization } from '../modules/organizations/entities/organization.entity';
+import { CareManagerOffice } from '../modules/care-managers/entities/care-manager-office.entity';
+import { PlacementCase } from '../modules/placement-cases/entities/placement-case.entity';
+import { ClientCondition } from '../modules/placement-cases/entities/client-condition.entity';
+import { MedicalConditionMaster } from '../modules/medical-conditions/entities/medical-condition-master.entity';
+import { CaseMedicalRequirement } from '../modules/placement-cases/entities/case-medical-requirement.entity';
+import { FacilityMedicalCapability } from '../modules/facilities/entities/facility-medical-capability.entity';
+import { CandidateFacility } from '../modules/placement-cases/entities/candidate-facility.entity';
 
 /**
  * クラウドPostgreSQL用の接続URL。
@@ -62,6 +70,11 @@ const AppDataSource = new DataSource({
   entities: [
     User,
     CareManager,
+    Organization,
+    CareManagerOffice,
+    PlacementCase,
+    ClientCondition,
+    CaseMedicalRequirement,
 
     FacilityType,
     Facility,
@@ -69,7 +82,9 @@ const AppDataSource = new DataSource({
     FacilityPricing,
     FacilityRequirement,
     FacilityStaff,
-
+    MedicalConditionMaster,
+    FacilityMedicalCapability,
+    CandidateFacility,
     Inquiry,
     InquiryMessage,
   ],

@@ -9,6 +9,10 @@ import { CareManagersModule } from './modules/care-managers/care-managers.module
 import { FacilitiesModule } from './modules/facilities/facilities.module';
 import { InquiriesModule } from './modules/inquiries/inquiries.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { CareManagerOfficesModule } from './modules/care-managers/care-manager-offices.module';
+import { PlacementCasesModule } from './modules/placement-cases/placement-cases.module';
+import { MedicalConditionsModule } from './modules/medical-conditions/medical-conditions.module';
 
 @Module({
   imports: [
@@ -77,6 +81,10 @@ import { AuthModule } from './modules/auth/auth.module';
     FacilitiesModule,
     InquiriesModule,
     AuthModule,
+    OrganizationsModule,
+    CareManagerOfficesModule,
+    PlacementCasesModule,
+    MedicalConditionsModule,
   ],
 
   controllers: [AppController],

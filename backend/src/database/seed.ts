@@ -3,6 +3,10 @@ import 'dotenv/config';
 import * as bcrypt from 'bcrypt';
 
 import AppDataSource from './data-source';
+import {
+  MedicalConditionCode,
+  MedicalConditionMaster,
+} from '../modules/medical-conditions/entities/medical-condition-master.entity';
 
 import {
   User,
@@ -73,6 +77,10 @@ async function seed() {
       AppDataSource.getRepository(FacilityRequirement);
 
     const facilityStaffRepository = AppDataSource.getRepository(FacilityStaff);
+
+    const medicalConditionRepository = AppDataSource.getRepository(
+      MedicalConditionMaster,
+    );
 
     /**
      * Seed用パスワードをbcryptでハッシュ化する。
@@ -630,6 +638,105 @@ async function seed() {
       console.log(
         `Created FacilityStaff assignment: ${user.email} -> ${facility.name}`,
       );
+    }
+
+    // ==================================================
+    // MEDICAL CONDITION MASTER
+    // ==================================================
+
+    const medicalConditions = [
+      {
+        code: MedicalConditionCode.GASTROSTOMY,
+        name: '胃ろう',
+        displayOrder: 1,
+      },
+      {
+        code: MedicalConditionCode.NASOGASTRIC_FEEDING,
+        name: '経鼻経管栄養',
+        displayOrder: 2,
+      },
+      {
+        code: MedicalConditionCode.IVH,
+        name: '中心静脈栄養（IVH）',
+        displayOrder: 3,
+      },
+      {
+        code: MedicalConditionCode.INSULIN,
+        name: 'インスリン',
+        displayOrder: 4,
+      },
+      {
+        code: MedicalConditionCode.HOME_OXYGEN,
+        name: '在宅酸素',
+        displayOrder: 5,
+      },
+      {
+        code: MedicalConditionCode.SUCTION,
+        name: 'たん吸引',
+        displayOrder: 6,
+      },
+      {
+        code: MedicalConditionCode.DIALYSIS,
+        name: '人工透析',
+        displayOrder: 7,
+      },
+      {
+        code: MedicalConditionCode.STOMA,
+        name: 'ストーマ',
+        displayOrder: 8,
+      },
+      {
+        code: MedicalConditionCode.URINARY_CATHETER,
+        name: '尿道カテーテル',
+        displayOrder: 9,
+      },
+      {
+        code: MedicalConditionCode.TRACHEOSTOMY,
+        name: '気管切開',
+        displayOrder: 10,
+      },
+      {
+        code: MedicalConditionCode.VENTILATOR,
+        name: '人工呼吸器',
+        displayOrder: 11,
+      },
+      {
+        code: MedicalConditionCode.PRESSURE_ULCER,
+        name: '褥瘡',
+        displayOrder: 12,
+      },
+      {
+        code: MedicalConditionCode.TERMINAL_CARE,
+        name: '終末期ケア',
+        displayOrder: 13,
+      },
+    ];
+
+    for (const condition of medicalConditions) {
+      let medicalCondition = await medicalConditionRepository.findOne({
+        where: {
+          code: condition.code,
+        },
+      });
+
+      if (!medicalCondition) {
+        medicalCondition = medicalConditionRepository.create({
+          code: condition.code,
+          name: condition.name,
+          displayOrder: condition.displayOrder,
+          isActive: true,
+        });
+
+        console.log(`Created MedicalConditionMaster: ${condition.code}`);
+      } else {
+        medicalCondition.name = condition.name;
+        medicalCondition.displayOrder = condition.displayOrder;
+        medicalCondition.isActive = true;
+
+        console.log(`Updated MedicalConditionMaster: ${condition.code}`);
+      }
+
+      await medicalConditionRepository.save(medicalCondition);
     }
 
     // ==================================================

@@ -30,6 +30,27 @@ export class FacilityAvailabilityResponseDto {
   availableCount: number | null;
 
   @ApiProperty({
+    description: '男性向け空床数',
+    example: 1,
+    nullable: true,
+  })
+  maleVacancy: number | null;
+
+  @ApiProperty({
+    description: '女性向け空床数',
+    example: 1,
+    nullable: true,
+  })
+  femaleVacancy: number | null;
+
+  @ApiProperty({
+    description: '個室の空床数',
+    example: 1,
+    nullable: true,
+  })
+  privateRoomVacancy: number | null;
+
+  @ApiProperty({
     description: '受け入れ可能日',
     example: '2026-09-15',
     nullable: true,
@@ -42,6 +63,13 @@ export class FacilityAvailabilityResponseDto {
     nullable: true,
   })
   note: string | null;
+
+  @ApiProperty({
+    description: '最終更新ユーザーID',
+    example: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    nullable: true,
+  })
+  updatedBy: string | null;
 
   @ApiProperty({
     description: '最終更新日時',
