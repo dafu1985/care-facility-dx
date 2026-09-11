@@ -19,6 +19,9 @@ import {
   FacilityMedicalCapability,
   FacilityMedicalCapabilityStatus,
 } from '../facilities/entities/facility-medical-capability.entity';
+import { FacilityAvailability } from '../facilities/entities/facility-availability.entity';
+import { FacilityPricing } from '../facilities/entities/facility-pricing.entity';
+import { FacilityRequirement } from '../facilities/entities/facility-requirement.entity';
 
 @Module({
   imports: [
@@ -30,6 +33,9 @@ import {
       MedicalConditionMaster,
       Facility,
       FacilityMedicalCapability,
+      FacilityAvailability,
+      FacilityPricing,
+      FacilityRequirement,
     ]),
   ],
   controllers: [PlacementCasesController],

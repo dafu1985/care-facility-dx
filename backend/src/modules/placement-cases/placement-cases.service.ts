@@ -37,6 +37,13 @@ import {
   PlacementCaseStatus,
 } from './entities/placement-case.entity';
 
+import {
+  AvailabilityStatus,
+  FacilityAvailability,
+} from '../facilities/entities/facility-availability.entity';
+import { FacilityPricing } from '../facilities/entities/facility-pricing.entity';
+import { FacilityRequirement } from '../facilities/entities/facility-requirement.entity';
+
 @Injectable()
 export class PlacementCasesService {
   constructor(
@@ -60,6 +67,15 @@ export class PlacementCasesService {
 
     @InjectRepository(FacilityMedicalCapability)
     private readonly facilityMedicalCapabilityRepository: Repository<FacilityMedicalCapability>,
+
+    @InjectRepository(FacilityAvailability)
+    private readonly facilityAvailabilityRepository: Repository<FacilityAvailability>,
+
+    @InjectRepository(FacilityPricing)
+    private readonly facilityPricingRepository: Repository<FacilityPricing>,
+
+    @InjectRepository(FacilityRequirement)
+    private readonly facilityRequirementRepository: Repository<FacilityRequirement>,
   ) {}
 
   /**
@@ -284,16 +300,17 @@ export class PlacementCasesService {
   /**
    * 案件に対して施設マッチングを実行する。
    *
-   * MVPでは医療条件のみを使って判定する。
+   * MVPでは利用者の要介護度と医療条件を使って判定する。
    *
    * 処理:
    * 1. 自分の案件か確認
-   * 2. 案件の医療条件を取得
+   * 2. 案件の医療条件・利用者条件を取得
    * 3. ACTIVE施設を取得
-   * 4. 各施設の医療対応能力を取得
-   * 5. REQUIRED条件を満たさない施設を除外
-   * 6. 医療条件スコアを計算
-   * 7. CandidateFacilityへ保存
+   * 4. 要介護度の受入条件を判定
+   * 5. 各施設の医療対応能力を取得
+   * 6. REQUIRED条件を満たさない施設を除外
+   * 7. 医療条件スコアを計算
+   * 8. CandidateFacilityへ保存
    */
   async runMatching(
     placementCaseId: string,
@@ -309,6 +326,14 @@ export class PlacementCasesService {
       },
     });
 
+    // 利用者条件を取得する。
+    // 未登録の場合もマッチング自体は実行できるようにする。
+    const clientCondition = await this.clientConditionRepository.findOne({
+      where: {
+        placementCaseId,
+      },
+    });
+
     // ACTIVEな施設だけをマッチング対象にする。
     const facilities = await this.facilityRepository.find({
       where: {
@@ -319,6 +344,73 @@ export class PlacementCasesService {
     const candidates: CandidateFacility[] = [];
 
     for (const facility of facilities) {
+      // 施設の受入条件を取得する。
+      const facilityRequirement =
+        await this.facilityRequirementRepository.findOne({
+          where: {
+            facilityId: facility.facilityId,
+          },
+        });
+
+      // 施設の料金情報を取得する。
+      const facilityPricing = await this.facilityPricingRepository.findOne({
+        where: {
+          facilityId: facility.facilityId,
+        },
+      });
+
+      // 施設の空床情報を取得する。
+      const facilityAvailability =
+        await this.facilityAvailabilityRepository.findOne({
+          where: {
+            facilityId: facility.facilityId,
+          },
+        });
+
+      // 利用者の要介護度が施設の受入範囲内か判定する。
+      const satisfiesCareLevel = this.satisfiesCareLevelCondition(
+        clientCondition,
+        facilityRequirement,
+      );
+
+      // 要介護度の受入条件を満たさない施設は候補から除外する。
+      if (!satisfiesCareLevel) {
+        continue;
+      }
+
+      // 利用者の予算上限内に施設の最低月額費用が収まっているか判定する。
+      const satisfiesBudget = this.satisfiesBudgetCondition(
+        clientCondition,
+        facilityPricing,
+      );
+
+      // 予算条件を満たさない施設は候補から除外する。
+      if (!satisfiesBudget) {
+        continue;
+      }
+
+      // 認知症の受入条件を満たしているか判定する。
+      const satisfiesDementia = this.satisfiesDementiaCondition(
+        clientCondition,
+        facilityRequirement,
+      );
+
+      // 認知症の受入条件を満たさない施設は候補から除外する。
+      if (!satisfiesDementia) {
+        continue;
+      }
+
+      // 終末期ケアの受入条件を満たしているか判定する。
+      const satisfiesEndOfLifeCare = this.satisfiesEndOfLifeCareCondition(
+        clientCondition,
+        facilityRequirement,
+      );
+
+      // 終末期ケアの受入条件を満たさない施設は候補から除外する。
+      if (!satisfiesEndOfLifeCare) {
+        continue;
+      }
+
       // 施設の医療対応能力を取得する。
       const capabilities = await this.facilityMedicalCapabilityRepository.find({
         where: {
@@ -337,10 +429,21 @@ export class PlacementCasesService {
       }
 
       // 医療条件をもとにスコアを計算する。
-      const matchScore = this.calculateMedicalMatchScore(
+      const medicalScore = this.calculateMedicalMatchScore(
         requirements,
         capabilities,
       );
+
+      // 希望エリアとの一致度をスコアへ加算する。
+      const areaScore = this.calculateAreaMatchScore(clientCondition, facility);
+
+      // 空床状況と入居希望日をもとにスコアを加算する。
+      const availabilityScore = this.calculateAvailabilityMatchScore(
+        clientCondition,
+        facilityAvailability,
+      );
+
+      const matchScore = medicalScore + areaScore + availabilityScore;
 
       const candidate = this.candidateFacilityRepository.create({
         placementCaseId,
@@ -391,6 +494,234 @@ export class PlacementCasesService {
         createdAt: 'ASC',
       },
     });
+  }
+
+  /**
+   * 利用者の要介護度が施設の受入範囲内か判定する。
+   *
+   * 利用者側に要介護度が未設定の場合は判定対象外とする。
+   * 施設側のmin/maxがnullの場合は、その方向の制限なしとして扱う。
+   */
+  private satisfiesCareLevelCondition(
+    clientCondition: ClientCondition | null,
+    requirement: FacilityRequirement | null,
+  ): boolean {
+    // 利用者側に要介護度が設定されていない場合は除外しない。
+    if (!clientCondition || clientCondition.careLevel === null) {
+      return true;
+    }
+
+    // 利用者側に条件があるのに施設側の受入条件が未登録の場合は、
+    // 安全側に倒して候補から除外する。
+    if (!requirement) {
+      return false;
+    }
+
+    // ClientCondition.careLevel は "CARE_1" ～ "CARE_5" の形式で保持される。
+    // 数値部分だけを取り出して施設側の min/max と比較する。
+    const careLevelMatch = clientCondition.careLevel.match(/^CARE_(\d+)$/);
+
+    // 想定外の形式の場合は安全側に倒して候補から除外する。
+    if (!careLevelMatch) {
+      return false;
+    }
+
+    const careLevel = Number(careLevelMatch[1]);
+
+    if (Number.isNaN(careLevel)) {
+      return false;
+    }
+
+    // 施設の最低要介護度を下回る場合は対象外。
+    if (
+      requirement.minCareLevel !== null &&
+      careLevel < requirement.minCareLevel
+    ) {
+      return false;
+    }
+
+    // 施設の最高要介護度を上回る場合は対象外。
+    if (
+      requirement.maxCareLevel !== null &&
+      careLevel > requirement.maxCareLevel
+    ) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 利用者の予算上限内に施設の最低月額費用が収まっているか判定する。
+   *
+   * 利用者側に予算上限が未設定の場合は判定対象外とする。
+   * 施設側の料金情報が未登録の場合は、安全側に倒して候補から除外する。
+   */
+  private satisfiesBudgetCondition(
+    clientCondition: ClientCondition | null,
+    pricing: FacilityPricing | null,
+  ): boolean {
+    // 利用者側に予算上限が設定されていない場合は除外しない。
+    if (!clientCondition || clientCondition.budgetMax === null) {
+      return true;
+    }
+
+    // 利用者側に予算条件があるのに施設側の料金情報が未登録の場合は除外する。
+    if (!pricing) {
+      return false;
+    }
+
+    // 施設の最低月額費用が予算上限を超えている場合は対象外。
+    if (pricing.monthlyCostMin > clientCondition.budgetMax) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 認知症の受入条件を満たしているか判定する。
+   *
+   * 利用者側で認知症対応が必要でない場合は判定対象外とする。
+   * 認知症対応が必要なのに施設側の受入条件が未登録の場合は、
+   * 安全側に倒して候補から除外する。
+   */
+  private satisfiesDementiaCondition(
+    clientCondition: ClientCondition | null,
+    requirement: FacilityRequirement | null,
+  ): boolean {
+    // 認知症対応が必要でない場合は除外しない。
+    if (!clientCondition || clientCondition.dementia !== true) {
+      return true;
+    }
+
+    // 施設側の受入条件が未登録の場合は除外する。
+    if (!requirement) {
+      return false;
+    }
+
+    // 認知症受入可能な施設だけ候補に残す。
+    return requirement.dementiaAccepted === true;
+  }
+
+  /**
+   * 終末期ケアの受入条件を満たしているか判定する。
+   *
+   * 利用者側で終末期ケアが必要でない場合は判定対象外とする。
+   * 必要なのに施設側の受入条件が未登録の場合は、
+   * 安全側に倒して候補から除外する。
+   */
+  private satisfiesEndOfLifeCareCondition(
+    clientCondition: ClientCondition | null,
+    requirement: FacilityRequirement | null,
+  ): boolean {
+    // 終末期ケアが必要でない場合は除外しない。
+    if (!clientCondition || clientCondition.endOfLifeCare !== true) {
+      return true;
+    }
+
+    // 施設側の受入条件が未登録の場合は除外する。
+    if (!requirement) {
+      return false;
+    }
+
+    // 終末期ケア対応可能な施設だけ候補に残す。
+    return requirement.endOfLifeCare === true;
+  }
+
+  /**
+   * 希望エリアに一致する場合のスコアを計算する。
+   *
+   * 希望エリアが未設定の場合は加点しない。
+   * 完全一致または部分一致した場合に加点する。
+   */
+  private calculateAreaMatchScore(
+    clientCondition: ClientCondition | null,
+    facility: Facility,
+  ): number {
+    if (!clientCondition?.desiredArea) {
+      return 0;
+    }
+
+    if (!facility.area) {
+      return 0;
+    }
+
+    const desiredArea = clientCondition.desiredArea.trim();
+    const facilityArea = facility.area.trim();
+
+    if (!desiredArea || !facilityArea) {
+      return 0;
+    }
+
+    if (facilityArea === desiredArea) {
+      return 10;
+    }
+
+    if (
+      facilityArea.includes(desiredArea) ||
+      desiredArea.includes(facilityArea)
+    ) {
+      return 5;
+    }
+
+    return 0;
+  }
+
+  /**
+   * 空床状況と入居希望日をもとにスコアを計算する。
+   *
+   * 空床情報はHard Filterにはせず、候補を残したまま優先順位へ反映する。
+   *
+   * 空床状態:
+   * AVAILABLE     +10
+   * FEW            +7
+   * CONSULTATION   +3
+   * FULL            +0
+   * SUSPENDED       +0
+   * UNKNOWN         +0
+   *
+   * 入居希望日:
+   * availableFrom が希望日以前なら +5
+   */
+  private calculateAvailabilityMatchScore(
+    clientCondition: ClientCondition | null,
+    availability: FacilityAvailability | null,
+  ): number {
+    if (!availability) {
+      return 0;
+    }
+
+    let score = 0;
+
+    switch (availability.status) {
+      case AvailabilityStatus.AVAILABLE:
+        score += 10;
+        break;
+
+      case AvailabilityStatus.FEW:
+        score += 7;
+        break;
+
+      case AvailabilityStatus.CONSULTATION:
+        score += 3;
+        break;
+
+      case AvailabilityStatus.FULL:
+      case AvailabilityStatus.SUSPENDED:
+      case AvailabilityStatus.UNKNOWN:
+        break;
+    }
+
+    if (
+      clientCondition?.desiredMoveInDate &&
+      availability.availableFrom &&
+      availability.availableFrom <= clientCondition.desiredMoveInDate
+    ) {
+      score += 5;
+    }
+
+    return score;
   }
 
   /**
