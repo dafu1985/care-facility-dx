@@ -301,15 +301,16 @@ export function CareManagerDashboardPage() {
               問い合わせ状況
             </Typography>
 
+            {/* 問い合わせサマリー */}
             <Box
               sx={{
                 display: "grid",
                 gridTemplateColumns: {
                   xs: "1fr",
-                  sm: "repeat(3, 1fr)",
+                  sm: "repeat(2, 1fr)",
+                  md: "repeat(4, 1fr)",
                 },
                 gap: 2,
-                mt: 2,
               }}
             >
               {/* 全問い合わせ */}
@@ -343,48 +344,97 @@ export function CareManagerDashboardPage() {
                 </CardActionArea>
               </Card>
 
+              {/* 未対応 */}
+              <Card variant="outlined">
+                <CardActionArea
+                  onClick={() => {
+                    navigate("/inquiries?status=OPEN");
+                  }}
+                  sx={{
+                    height: "100%",
+                  }}
+                >
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom>
+                      未対応
+                    </Typography>
+
+                    <Typography variant="h4">
+                      {inquirySummary.openCount}
+
+                      <Typography
+                        component="span"
+                        sx={{
+                          ml: 0.5,
+                        }}
+                      >
+                        件
+                      </Typography>
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+
               {/* 対応中 */}
               <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    対応中
-                  </Typography>
-
-                  <Typography variant="h4">
-                    {inquirySummary.openCount}
-
-                    <Typography
-                      component="span"
-                      sx={{
-                        ml: 0.5,
-                      }}
-                    >
-                      件
+                <CardActionArea
+                  onClick={() => {
+                    navigate("/inquiries?status=IN_PROGRESS");
+                  }}
+                  sx={{
+                    height: "100%",
+                  }}
+                >
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom>
+                      対応中
                     </Typography>
-                  </Typography>
-                </CardContent>
+
+                    <Typography variant="h4">
+                      {inquirySummary.inProgressCount}
+
+                      <Typography
+                        component="span"
+                        sx={{
+                          ml: 0.5,
+                        }}
+                      >
+                        件
+                      </Typography>
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
               </Card>
 
               {/* 回答済み */}
               <Card variant="outlined">
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    回答済み
-                  </Typography>
-
-                  <Typography variant="h4">
-                    {inquirySummary.answeredCount}
-
-                    <Typography
-                      component="span"
-                      sx={{
-                        ml: 0.5,
-                      }}
-                    >
-                      件
+                <CardActionArea
+                  onClick={() => {
+                    navigate("/inquiries?status=ANSWERED");
+                  }}
+                  sx={{
+                    height: "100%",
+                  }}
+                >
+                  <CardContent>
+                    <Typography color="text.secondary" gutterBottom>
+                      回答済み
                     </Typography>
-                  </Typography>
-                </CardContent>
+
+                    <Typography variant="h4">
+                      {inquirySummary.answeredCount}
+
+                      <Typography
+                        component="span"
+                        sx={{
+                          ml: 0.5,
+                        }}
+                      >
+                        件
+                      </Typography>
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
               </Card>
             </Box>
 

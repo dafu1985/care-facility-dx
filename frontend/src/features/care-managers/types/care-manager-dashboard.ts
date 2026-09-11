@@ -9,9 +9,29 @@ export interface CareManagerDashboardInquiry {
 }
 
 export interface CareManagerDashboardInquirySummary {
+  /**
+   * 全問い合わせ件数。
+   */
   totalCount: number;
+
+  /**
+   * 未対応件数。
+   */
   openCount: number;
+
+  /**
+   * 対応中件数。
+   */
+  inProgressCount: number;
+
+  /**
+   * 回答済み件数。
+   */
   answeredCount: number;
+
+  /**
+   * 最近の問い合わせ。
+   */
   recentInquiries: CareManagerDashboardInquiry[];
 }
 
