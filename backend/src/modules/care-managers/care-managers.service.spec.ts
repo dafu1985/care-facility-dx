@@ -156,7 +156,9 @@ describe('CareManagersService', () => {
         inquirySummary: {
           totalCount: 3,
 
-          openCount: 2,
+          openCount: 1,
+
+          inProgressCount: 1,
 
           answeredCount: 1,
 

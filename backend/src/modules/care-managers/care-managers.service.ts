@@ -76,14 +76,22 @@ export class CareManagersService {
      * IN_PROGRESS:
      *   施設側が対応中
      */
+    /**
+     * 未対応件数。
+     */
     const openCount = inquiries.filter(
-      (inquiry) =>
-        inquiry.status === InquiryStatus.OPEN ||
-        inquiry.status === InquiryStatus.IN_PROGRESS,
+      (inquiry) => inquiry.status === InquiryStatus.OPEN,
     ).length;
 
     /**
-     * 回答済み問い合わせ件数。
+     * 対応中件数。
+     */
+    const inProgressCount = inquiries.filter(
+      (inquiry) => inquiry.status === InquiryStatus.IN_PROGRESS,
+    ).length;
+
+    /**
+     * 回答済み件数。
      */
     const answeredCount = inquiries.filter(
       (inquiry) => inquiry.status === InquiryStatus.ANSWERED,
@@ -125,6 +133,8 @@ export class CareManagersService {
         openCount,
 
         answeredCount,
+
+        inProgressCount,
 
         recentInquiries,
       },
