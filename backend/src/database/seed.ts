@@ -83,6 +83,12 @@ async function seed() {
     // CARE_MANAGER USER
     // ==================================================
 
+    /**
+     * ケアマネジャー用ユーザーを取得する。
+     *
+     * 存在しない場合は新規作成し、
+     * 存在する場合もSeed用の状態へ更新する。
+     */
     let careManagerUser = await userRepository.findOne({
       where: {
         email: 'caremanager@example.com',
@@ -101,12 +107,13 @@ async function seed() {
     } else {
       /**
        * 既存ユーザーの場合も、
-       * Seed時のパスワードへ更新する。
+       * Seed実行時にCARE_MANAGERとして正しい状態へ戻す。
        */
+      careManagerUser.role = UserRole.CARE_MANAGER;
       careManagerUser.passwordHash = passwordHash;
       careManagerUser.status = UserStatus.ACTIVE;
 
-      console.log('Updated CARE_MANAGER password.');
+      console.log('Updated CARE_MANAGER user.');
     }
 
     /**
@@ -114,28 +121,51 @@ async function seed() {
      */
     careManagerUser = await userRepository.save(careManagerUser);
 
+    // ==================================================
+    // CARE_MANAGER PROFILE
+    // ==================================================
+
     /**
-     * ケアマネ詳細情報。
+     * ケアマネジャー詳細情報を取得する。
+     *
+     * app_user と care_manager は
+     * user_id を共有する1対1の関係。
      */
-    const existingCareManager = await careManagerRepository.findOne({
+    let careManager = await careManagerRepository.findOne({
       where: {
         userId: careManagerUser.userId,
       },
     });
 
-    if (!existingCareManager) {
-      const careManager = careManagerRepository.create({
+    if (!careManager) {
+      /**
+       * care_manager が存在しない場合は作成する。
+       */
+      careManager = careManagerRepository.create({
         userId: careManagerUser.userId,
-
         organizationName: 'サンプル居宅介護支援事業所',
-
         licenseNumber: 'CM-DEMO-001',
       });
 
-      await careManagerRepository.save(careManager);
-
       console.log('Created CareManager.');
+    } else {
+      /**
+       * 既存レコードの場合もSeedデータへ更新する。
+       *
+       * これにより古いSeedデータや不完全なデータが
+       * 残っていても正しい状態へ戻せる。
+       */
+      careManager.organizationName = 'サンプル居宅介護支援事業所';
+
+      careManager.licenseNumber = 'CM-DEMO-001';
+
+      console.log('Updated CareManager.');
     }
+
+    /**
+     * 新規・既存どちらの場合も保存する。
+     */
+    await careManagerRepository.save(careManager);
 
     // ==================================================
     // FACILITY USER HELPER
