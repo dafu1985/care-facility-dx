@@ -341,6 +341,20 @@ export class PlacementCasesService {
       },
     });
 
+    /**
+     * 既存候補施設を取得する。
+     *
+     * 再マッチング時に同じ施設が候補になった場合、
+     * CandidateFacilityを新規作成せず既存レコードを再利用する。
+     * これによりcandidateFacilityIdを安定させる。
+     */
+    const existingCandidates =
+      await this.candidateFacilityRepository.find({
+        where: {
+          placementCaseId,
+        },
+      });
+
     const candidates: CandidateFacility[] = [];
 
     for (const facility of facilities) {
@@ -445,6 +459,22 @@ export class PlacementCasesService {
 
       const matchScore = medicalScore + areaScore + availabilityScore;
 
+      const existingCandidate = existingCandidates.find(
+        (candidate) => candidate.facilityId === facility.facilityId,
+      );
+
+      if (existingCandidate) {
+        /**
+         * 既存候補はID・ステータス・メモを維持し、
+         * マッチスコアだけ最新値へ更新する。
+         */
+        existingCandidate.matchScore = matchScore;
+
+        candidates.push(existingCandidate);
+
+        continue;
+      }
+
       const candidate = this.candidateFacilityRepository.create({
         placementCaseId,
         facilityId: facility.facilityId,
@@ -456,16 +486,37 @@ export class PlacementCasesService {
       candidates.push(candidate);
     }
 
-    // 既存のマッチング結果を削除して再作成する。
-    await this.candidateFacilityRepository.delete({
-      placementCaseId,
-    });
+    /**
+     * 今回のマッチング対象から外れた既存候補は削除せず、
+     * DECLINEDへ更新して履歴を保持する。
+     *
+     * CandidateFacilityを物理削除しないことで、
+     * Inquiry.candidateFacilityIdとの参照を維持する。
+     */
+    const matchedFacilityIds = new Set(
+      candidates.map((candidate) => candidate.facilityId),
+    );
 
-    if (candidates.length === 0) {
+    const unmatchedExistingCandidates = existingCandidates.filter(
+      (candidate) => !matchedFacilityIds.has(candidate.facilityId),
+    );
+
+    for (const candidate of unmatchedExistingCandidates) {
+      candidate.status = CandidateFacilityStatus.DECLINED;
+    }
+
+    const candidatesToSave = [
+      ...candidates,
+      ...unmatchedExistingCandidates,
+    ];
+
+    if (candidatesToSave.length === 0) {
       return [];
     }
 
-    return this.candidateFacilityRepository.save(candidates);
+    await this.candidateFacilityRepository.save(candidatesToSave);
+
+    return candidates;
   }
 
   /**
