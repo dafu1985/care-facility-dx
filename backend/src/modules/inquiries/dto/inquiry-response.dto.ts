@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+﻿import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class InquiryMessageResponseDto {
   @ApiProperty({
@@ -45,6 +45,20 @@ export class CreateInquiryResponseDto {
     example: '5ea06a45-7587-4198-b94c-56e0044399c7',
   })
   facilityId: string;
+
+  @ApiPropertyOptional({
+    description: '問い合わせ元の施設探し案件ID',
+    example: '4d3b87cb-5096-4b26-be90-0ff915b1d6d2',
+    nullable: true,
+  })
+  placementCaseId: string | null;
+
+  @ApiPropertyOptional({
+    description: '問い合わせ対象の候補施設ID',
+    example: 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7',
+    nullable: true,
+  })
+  candidateFacilityId: string | null;
 
   @ApiProperty({
     description: '問い合わせ作成ユーザーID',
@@ -97,6 +111,20 @@ export class InquiryResponseDto {
   })
   facilityId: string;
 
+  @ApiPropertyOptional({
+    description: '問い合わせ元の施設探し案件ID',
+    example: '4d3b87cb-5096-4b26-be90-0ff915b1d6d2',
+    nullable: true,
+  })
+  placementCaseId: string | null;
+
+  @ApiPropertyOptional({
+    description: '問い合わせ対象の候補施設ID',
+    example: 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7',
+    nullable: true,
+  })
+  candidateFacilityId: string | null;
+
   @ApiProperty({
     description: '問い合わせ作成ユーザーID',
     example: '01541a48-ac15-4279-ac45-166b923f14c9',
@@ -116,7 +144,7 @@ export class InquiryResponseDto {
   status: string;
 
   @ApiPropertyOptional({
-    description: '最後にメッセージまたはステータス変更があった日時',
+    description: '最終メッセージまたはステータス変更日時',
     example: '2026-09-07T08:06:08.283Z',
     nullable: true,
   })
@@ -155,6 +183,20 @@ export class InquiryListItemResponseDto {
   })
   facilityId: string;
 
+  @ApiPropertyOptional({
+    description: '問い合わせ元の施設探し案件ID',
+    example: '4d3b87cb-5096-4b26-be90-0ff915b1d6d2',
+    nullable: true,
+  })
+  placementCaseId: string | null;
+
+  @ApiPropertyOptional({
+    description: '問い合わせ対象の候補施設ID',
+    example: 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7',
+    nullable: true,
+  })
+  candidateFacilityId: string | null;
+
   @ApiProperty({
     description: '問い合わせ作成ユーザーID',
     example: '01541a48-ac15-4279-ac45-166b923f14c9',
@@ -174,7 +216,7 @@ export class InquiryListItemResponseDto {
   status: string;
 
   @ApiPropertyOptional({
-    description: '最後にやり取りがあった日時',
+    description: '最終更新日時',
     example: '2026-09-07T08:06:08.283Z',
     nullable: true,
   })

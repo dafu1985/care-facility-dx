@@ -1,4 +1,4 @@
-import {
+﻿import {
   CreateInquiryResponseDto,
   InquiryListItemResponseDto,
   InquiryMessageResponseDto,
@@ -14,6 +14,10 @@ export class InquiryMapper {
       inquiryId: inquiry.inquiryId,
 
       facilityId: inquiry.facilityId,
+
+      placementCaseId: inquiry.placementCaseId,
+
+      candidateFacilityId: inquiry.candidateFacilityId,
 
       createdByUserId: inquiry.createdByUserId,
 
@@ -49,6 +53,10 @@ export class InquiryMapper {
 
       facilityId: inquiry.facilityId,
 
+      placementCaseId: inquiry.placementCaseId,
+
+      candidateFacilityId: inquiry.candidateFacilityId,
+
       createdByUserId: inquiry.createdByUserId,
 
       subject: inquiry.subject,
@@ -73,9 +81,12 @@ export class InquiryMapper {
 
       facilityId: inquiry.facilityId,
 
+      placementCaseId: inquiry.placementCaseId,
+
+      candidateFacilityId: inquiry.candidateFacilityId,
+
       /**
-       * findAll() で
-       * inquiry.facility をJOINして取得する。
+       * findAll() で inquiry.facility をJOINして取得する。
        */
       facilityName: inquiry.facility?.name ?? '施設名未取得',
 
