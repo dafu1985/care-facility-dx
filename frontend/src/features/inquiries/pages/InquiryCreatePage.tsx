@@ -1,4 +1,4 @@
-import {
+﻿import {
   Alert,
   Box,
   Button,
@@ -11,7 +11,11 @@ import {
   Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 
 import { getFacility } from "../../facilities/api/get-facility";
 import type { FacilitySearchItem } from "../../facilities/types/facility-search";
@@ -19,7 +23,7 @@ import type { FacilitySearchItem } from "../../facilities/types/facility-search"
 import { createInquiry } from "../api/create-inquiry";
 
 /**
- * CARE_MANAGER向け問い合わせ作成画面。
+ * ケアマネジャー向け問い合わせ作成画面。
  */
 export function InquiryCreatePage() {
   const navigate = useNavigate();
@@ -28,7 +32,20 @@ export function InquiryCreatePage() {
     facilityId: string;
   }>();
 
-  const [facility, setFacility] = useState<FacilitySearchItem | null>(null);
+  const [searchParams] = useSearchParams();
+
+  /**
+   * 案件の候補施設から遷移した場合に設定される。
+   * 通常の施設詳細画面からの問い合わせでは null。
+   */
+  const placementCaseId = searchParams.get("placementCaseId");
+
+  const candidateFacilityId = searchParams.get(
+    "candidateFacilityId",
+  );
+
+  const [facility, setFacility] =
+    useState<FacilitySearchItem | null>(null);
 
   const [subject, setSubject] = useState("");
 
@@ -45,6 +62,7 @@ export function InquiryCreatePage() {
    */
   useEffect(() => {
     if (!facilityId) {
+      setIsLoading(false);
       return;
     }
 
@@ -64,9 +82,14 @@ export function InquiryCreatePage() {
           return;
         }
 
-        console.error("施設情報の取得に失敗しました。", error);
+        console.error(
+          "施設情報の取得に失敗しました。",
+          error,
+        );
 
-        setError("施設情報の取得に失敗しました。");
+        setError(
+          "施設情報の取得に失敗しました。時間をおいて再度お試しください。",
+        );
       })
       .finally(() => {
         if (cancelled) {
@@ -84,30 +107,26 @@ export function InquiryCreatePage() {
   /**
    * 問い合わせを作成する。
    */
-  const handleSubmit = async () => {
-    if (!facilityId) {
+  async function handleSubmit() {
+    if (!facilityId || isSubmitting) {
       return;
     }
 
     const trimmedSubject = subject.trim();
-
     const trimmedBody = body.trim();
 
     if (trimmedSubject === "") {
       setError("件名を入力してください。");
-
       return;
     }
 
     if (trimmedSubject.length > 255) {
       setError("件名は255文字以内で入力してください。");
-
       return;
     }
 
     if (trimmedBody === "") {
       setError("問い合わせ内容を入力してください。");
-
       return;
     }
 
@@ -117,22 +136,43 @@ export function InquiryCreatePage() {
 
       const response = await createInquiry({
         facilityId,
+
+        /**
+         * 候補施設経由の場合のみ案件IDを送信する。
+         */
+        ...(placementCaseId
+          ? {
+              placementCaseId,
+            }
+          : {}),
+
+        /**
+         * 候補施設経由の場合のみ候補施設IDを送信する。
+         */
+        ...(candidateFacilityId
+          ? {
+              candidateFacilityId,
+            }
+          : {}),
+
         subject: trimmedSubject,
         body: trimmedBody,
       });
 
-      /**
-       * 作成した問い合わせ詳細へ遷移する。
-       */
       navigate(`/inquiries/${response.inquiryId}`);
     } catch (error) {
-      console.error("問い合わせ作成に失敗しました。", error);
+      console.error(
+        "問い合わせの作成に失敗しました。",
+        error,
+      );
 
-      setError("問い合わせ作成に失敗しました。");
+      setError(
+        "問い合わせの作成に失敗しました。時間をおいて再度お試しください。",
+      );
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }
 
   /**
    * 読み込み中。
@@ -153,7 +193,7 @@ export function InquiryCreatePage() {
   }
 
   /**
-   * 初期取得失敗。
+   * 初期取得エラー。
    */
   if (error && !facility) {
     return (
@@ -169,7 +209,7 @@ export function InquiryCreatePage() {
   }
 
   /**
-   * 施設情報が取得できない場合。
+   * 施設情報が取得できなかった場合。
    */
   if (!facility) {
     return (
@@ -180,7 +220,7 @@ export function InquiryCreatePage() {
         }}
       >
         <Alert severity="warning">
-          問い合わせ先施設を取得できませんでした。
+          問い合わせ先の施設情報を取得できませんでした。
         </Alert>
       </Container>
     );
@@ -198,17 +238,30 @@ export function InquiryCreatePage() {
         <Box>
           <Button
             onClick={() => {
-              navigate(`/facilities/${facility.facilityId}`);
+              if (placementCaseId) {
+                navigate(
+                  `/placement-cases/${placementCaseId}`,
+                );
+                return;
+              }
+
+              navigate(
+                `/facilities/${facility.facilityId}`,
+              );
             }}
           >
-            ← 施設詳細へ戻る
+            ← 戻る
           </Button>
         </Box>
 
         {/* 問い合わせ先 */}
         <Card>
           <CardContent>
-            <Typography variant="h5" component="h1" gutterBottom>
+            <Typography
+              variant="h5"
+              component="h1"
+              gutterBottom
+            >
               施設への問い合わせ
             </Typography>
 
@@ -224,6 +277,18 @@ export function InquiryCreatePage() {
             <Typography color="text.secondary">
               {facility.address ?? facility.area}
             </Typography>
+
+            {placementCaseId &&
+              candidateFacilityId && (
+                <Alert
+                  severity="info"
+                  sx={{
+                    mt: 2,
+                  }}
+                >
+                  施設探し案件の候補施設への問い合わせです。
+                </Alert>
+              )}
           </CardContent>
         </Card>
 
@@ -231,14 +296,22 @@ export function InquiryCreatePage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">問い合わせ内容</Typography>
+              <Typography variant="h6">
+                問い合わせ内容
+              </Typography>
 
-              {error && <Alert severity="error">{error}</Alert>}
+              {error && (
+                <Alert severity="error">
+                  {error}
+                </Alert>
+              )}
 
               <TextField
                 label="件名"
                 value={subject}
-                onChange={(event) => setSubject(event.target.value)}
+                onChange={(event) => {
+                  setSubject(event.target.value);
+                }}
                 slotProps={{
                   htmlInput: {
                     maxLength: 255,
@@ -252,8 +325,10 @@ export function InquiryCreatePage() {
               <TextField
                 label="問い合わせ内容"
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
-                placeholder="例：要介護3の利用者様について、現在受入可能でしょうか。"
+                onChange={(event) => {
+                  setBody(event.target.value);
+                }}
+                placeholder="例：要介護3の利用者について、現在受け入れ可能でしょうか。"
                 multiline
                 minRows={6}
                 required
@@ -267,10 +342,14 @@ export function InquiryCreatePage() {
                   void handleSubmit();
                 }}
                 disabled={
-                  isSubmitting || subject.trim() === "" || body.trim() === ""
+                  isSubmitting ||
+                  subject.trim() === "" ||
+                  body.trim() === ""
                 }
               >
-                {isSubmitting ? "送信中..." : "問い合わせを送信"}
+                {isSubmitting
+                  ? "送信中..."
+                  : "問い合わせを送信"}
               </Button>
             </Stack>
           </CardContent>

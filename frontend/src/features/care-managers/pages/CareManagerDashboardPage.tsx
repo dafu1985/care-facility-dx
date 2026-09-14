@@ -1,4 +1,4 @@
-import {
+﻿import {
   Alert,
   Box,
   Button,
@@ -80,7 +80,7 @@ function getInquiryStatusColor(
 }
 
 /**
- * ISO形式の日時を日本向けの日時表示へ変換する。
+ * ISO形式の日時を日本向けの表示へ変換する。
  *
  * @param value ISO形式の日時文字列
  * @returns 日本向けに整形した日時
@@ -110,7 +110,9 @@ function formatDateTime(value: string | null): string {
  *
  * ケアマネジャー情報、
  * 問い合わせ状況、
- * 最近の問い合わせを表示する。
+ * 最近の問い合わせ、
+ * 施設探し案件、
+ * 施設検索への導線を表示する。
  */
 export function CareManagerDashboardPage() {
   /**
@@ -174,7 +176,9 @@ export function CareManagerDashboardPage() {
           error,
         );
 
-        setError("ケアマネジャーダッシュボードの取得に失敗しました。");
+        setError(
+          "ケアマネジャーダッシュボードの取得に失敗しました。",
+        );
       })
       .finally(() => {
         if (cancelled) {
@@ -264,11 +268,17 @@ export function CareManagerDashboardPage() {
             gap: 2,
           }}
         >
-          <Typography variant="h5" component="h1">
+          <Typography
+            variant="h5"
+            component="h1"
+          >
             ケアマネジャーダッシュボード
           </Typography>
 
-          <Button variant="outlined" onClick={handleLogout}>
+          <Button
+            variant="outlined"
+            onClick={handleLogout}
+          >
             ログアウト
           </Button>
         </Box>
@@ -276,7 +286,10 @@ export function CareManagerDashboardPage() {
         {/* ケアマネジャー基本情報 */}
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography
+              variant="h6"
+              gutterBottom
+            >
               ケアマネジャー情報
             </Typography>
 
@@ -294,14 +307,46 @@ export function CareManagerDashboardPage() {
           </CardContent>
         </Card>
 
+        {/* 施設探し案件 */}
+        <Card>
+          <CardContent>
+            <Typography
+              variant="h6"
+              gutterBottom
+            >
+              施設探し案件
+            </Typography>
+
+            <Typography
+              color="text.secondary"
+              sx={{
+                mb: 2,
+              }}
+            >
+              利用者ごとの入居条件を管理し、条件に合う施設を検索します。
+            </Typography>
+
+            <Button
+              variant="contained"
+              onClick={() => {
+                navigate("/placement-cases");
+              }}
+            >
+              施設探し案件を見る
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* 問い合わせサマリー */}
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography
+              variant="h6"
+              gutterBottom
+            >
               問い合わせ状況
             </Typography>
 
-            {/* 問い合わせサマリー */}
             <Box
               sx={{
                 display: "grid",
@@ -324,7 +369,10 @@ export function CareManagerDashboardPage() {
                   }}
                 >
                   <CardContent>
-                    <Typography color="text.secondary" gutterBottom>
+                    <Typography
+                      color="text.secondary"
+                      gutterBottom
+                    >
                       全問い合わせ
                     </Typography>
 
@@ -355,7 +403,10 @@ export function CareManagerDashboardPage() {
                   }}
                 >
                   <CardContent>
-                    <Typography color="text.secondary" gutterBottom>
+                    <Typography
+                      color="text.secondary"
+                      gutterBottom
+                    >
                       未対応
                     </Typography>
 
@@ -386,7 +437,10 @@ export function CareManagerDashboardPage() {
                   }}
                 >
                   <CardContent>
-                    <Typography color="text.secondary" gutterBottom>
+                    <Typography
+                      color="text.secondary"
+                      gutterBottom
+                    >
                       対応中
                     </Typography>
 
@@ -417,7 +471,10 @@ export function CareManagerDashboardPage() {
                   }}
                 >
                   <CardContent>
-                    <Typography color="text.secondary" gutterBottom>
+                    <Typography
+                      color="text.secondary"
+                      gutterBottom
+                    >
                       回答済み
                     </Typography>
 
@@ -455,7 +512,10 @@ export function CareManagerDashboardPage() {
         {/* 最近の問い合わせ */}
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography
+              variant="h6"
+              gutterBottom
+            >
               最近の問い合わせ
             </Typography>
 
@@ -471,13 +531,20 @@ export function CareManagerDashboardPage() {
                     role="button"
                     tabIndex={0}
                     onClick={() => {
-                      navigate(`/inquiries/${inquiry.inquiryId}`);
+                      navigate(
+                        `/inquiries/${inquiry.inquiryId}`,
+                      );
                     }}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
                         event.preventDefault();
 
-                        navigate(`/inquiries/${inquiry.inquiryId}`);
+                        navigate(
+                          `/inquiries/${inquiry.inquiryId}`,
+                        );
                       }
                     }}
                     sx={{
@@ -529,7 +596,9 @@ export function CareManagerDashboardPage() {
                       }}
                     >
                       最終更新：
-                      {formatDateTime(inquiry.lastMessageAt)}
+                      {formatDateTime(
+                        inquiry.lastMessageAt,
+                      )}
                     </Typography>
 
                     {/* ステータス */}
@@ -542,13 +611,20 @@ export function CareManagerDashboardPage() {
                         mt: 1,
                       }}
                     >
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                      >
                         ステータス：
                       </Typography>
 
                       <Chip
-                        label={getInquiryStatusLabel(inquiry.status)}
-                        color={getInquiryStatusColor(inquiry.status)}
+                        label={getInquiryStatusLabel(
+                          inquiry.status,
+                        )}
+                        color={getInquiryStatusColor(
+                          inquiry.status,
+                        )}
                         size="small"
                       />
                     </Box>
@@ -562,7 +638,10 @@ export function CareManagerDashboardPage() {
         {/* 施設検索 */}
         <Card>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography
+              variant="h6"
+              gutterBottom
+            >
               施設を探す
             </Typography>
 

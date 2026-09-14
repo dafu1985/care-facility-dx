@@ -10,6 +10,8 @@ import { FacilitySearchPage } from "../features/facilities/pages/FacilitySearchP
 import { InquiryCreatePage } from "../features/inquiries/pages/InquiryCreatePage";
 import { InquiryDetailPage } from "../features/inquiries/pages/InquiryDetailPage";
 import { InquiryListPage } from "../features/inquiries/pages/InquiryListPage";
+import { PlacementCaseListPage } from "../features/placement-cases/pages/PlacementCaseListPage";
+import { PlacementCaseDetailPage } from "../features/placement-cases/pages/PlacementCaseDetailPage";
 
 /**
  * アプリケーション全体のルーティング設定。
@@ -93,6 +95,30 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <InquiryCreatePage />
+      </RequireAuth>
+    ),
+  },
+
+  /**
+   * 施設探し案件一覧。
+   */
+  {
+    path: "/placement-cases",
+    element: (
+      <RequireAuth>
+        <PlacementCaseListPage />
+      </RequireAuth>
+    ),
+  },
+
+  /**
+   * 施設探し案件詳細。
+   */
+  {
+    path: "/placement-cases/:placementCaseId",
+    element: (
+      <RequireAuth>
+        <PlacementCaseDetailPage />
       </RequireAuth>
     ),
   },

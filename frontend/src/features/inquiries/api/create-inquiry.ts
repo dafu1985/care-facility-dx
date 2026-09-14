@@ -1,12 +1,18 @@
-import { apiClient } from "../../../api/api-client";
+﻿import { apiClient } from "../../../api/api-client";
 
 /**
  * 問い合わせ作成リクエスト。
  *
- * BackendのCreateInquiryDtoに合わせる。
+ * 通常の施設問い合わせでは facilityId のみを指定する。
+ * 施設探し案件の候補施設から問い合わせる場合は、
+ * placementCaseId と candidateFacilityId も指定する。
  */
 export interface CreateInquiryRequest {
   facilityId: string;
+
+  placementCaseId?: string;
+
+  candidateFacilityId?: string;
 
   subject: string;
 
@@ -20,6 +26,10 @@ export interface CreateInquiryResponse {
   inquiryId: string;
 
   facilityId: string;
+
+  placementCaseId: string | null;
+
+  candidateFacilityId: string | null;
 
   createdByUserId: string;
 
