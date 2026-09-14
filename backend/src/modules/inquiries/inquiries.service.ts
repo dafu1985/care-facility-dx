@@ -1,5 +1,6 @@
 ﻿import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -139,6 +140,25 @@ export class InquiriesService {
         }
       }
 
+      /**
+       * 同じ候補施設に対して進行中の問い合わせが既に存在する場合は、
+       * 重複して新しいInquiryを作成しない。
+       */
+      if (dto.candidateFacilityId) {
+        const existingInquiry = await inquiryRepository.findOne({
+          where: {
+            candidateFacilityId: dto.candidateFacilityId,
+            status: InquiryStatus.OPEN,
+          },
+        });
+
+        if (existingInquiry) {
+          throw new ConflictException(
+            'An open inquiry already exists for this candidate facility',
+          );
+        }
+      }
+
       const now = new Date();
 
       const inquiry = inquiryRepository.create({
@@ -180,8 +200,7 @@ export class InquiriesService {
        * 案件ステータスを INQUIRING に更新する。
        */
       if (placementCase) {
-        const placementCaseRepository =
-          manager.getRepository(PlacementCase);
+        const placementCaseRepository = manager.getRepository(PlacementCase);
 
         placementCase.status = PlacementCaseStatus.INQUIRING;
 
@@ -514,6 +533,3 @@ export class InquiriesService {
     );
   }
 }
-
-
-

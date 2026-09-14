@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   DataSource,
   EntityManager,
@@ -14,6 +18,8 @@ import {
   FacilityStaffStatus,
 } from '../facilities/entities/facility-staff.entity';
 import { UserRole } from '../users/entities/user.entity';
+import { CandidateFacility } from '../placement-cases/entities/candidate-facility.entity';
+import { PlacementCase } from '../placement-cases/entities/placement-case.entity';
 
 import { Inquiry, InquiryStatus } from './entities/inquiry.entity';
 import { InquiriesService } from './inquiries.service';
@@ -95,6 +101,26 @@ describe('InquiriesService authorization', () => {
   };
 
   /**
+   * CandidateFacility Repository モック。
+   */
+  const candidateFacilityRepository = {
+    findOne: jest.fn<() => Promise<CandidateFacility | null>>(),
+
+    save: jest.fn<
+      (candidateFacility: CandidateFacility) => Promise<CandidateFacility>
+    >(),
+  };
+
+  /**
+   * PlacementCase Repository モック。
+   */
+  const placementCaseRepository = {
+    findOne: jest.fn<() => Promise<PlacementCase | null>>(),
+
+    save: jest.fn<(placementCase: PlacementCase) => Promise<PlacementCase>>(),
+  };
+
+  /**
    * EntityManager モック。
    */
   const manager = {
@@ -121,6 +147,10 @@ describe('InquiriesService authorization', () => {
     facilityId: '5ea06a45-7587-4198-b94c-56e0044399c7',
 
     createdByUserId: '01541a48-ac15-4279-ac45-166b923f14c9',
+
+    placementCaseId: null,
+
+    candidateFacilityId: null,
 
     subject: '空き状況について',
 
@@ -224,6 +254,14 @@ describe('InquiriesService authorization', () => {
         return facilityStaffRepository;
       }
 
+      if (entity === CandidateFacility) {
+        return candidateFacilityRepository;
+      }
+
+      if (entity === PlacementCase) {
+        return placementCaseRepository;
+      }
+
       return {};
     }) as never);
 
@@ -290,6 +328,62 @@ describe('InquiriesService authorization', () => {
 
     return queryBuilder;
   };
+
+  describe('create duplicate inquiry', () => {
+    it('同じ候補施設にOPENな問い合わせが存在する場合は409になる', async () => {
+      const placementCaseId = '4d3b87cb-5096-4b26-be90-0ff915b1d6d2';
+      const candidateFacilityId = 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7';
+
+      const placementCase = {
+        placementCaseId,
+        careManagerId: careManagerUser.userId,
+      } as PlacementCase;
+
+      const candidateFacility = {
+        candidateFacilityId,
+        placementCaseId,
+        facilityId: ownInquiry.facilityId,
+      } as CandidateFacility;
+
+      const existingOpenInquiry: Inquiry = {
+        ...ownInquiry,
+        inquiryId: '441a3919-ffc5-4cf8-81d3-bed4db91c694',
+        placementCaseId,
+        candidateFacilityId,
+        status: InquiryStatus.OPEN,
+      };
+
+      placementCaseRepository.findOne.mockResolvedValue(placementCase);
+      candidateFacilityRepository.findOne.mockResolvedValue(candidateFacility);
+      inquiryRepository.findOne.mockResolvedValue(existingOpenInquiry);
+
+      await expect(
+        service.create(
+          {
+            facilityId: ownInquiry.facilityId,
+            placementCaseId,
+            candidateFacilityId,
+            subject: '重複問い合わせテスト',
+            body: '同じ候補施設へのOPEN問い合わせは作成できないことを確認します。',
+          },
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(ConflictException);
+
+      expect(inquiryRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          candidateFacilityId,
+          status: InquiryStatus.OPEN,
+        },
+      });
+
+      expect(inquiryRepository.save).not.toHaveBeenCalled();
+      expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+      expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      expect(candidateFacilityRepository.save).not.toHaveBeenCalled();
+      expect(placementCaseRepository.save).not.toHaveBeenCalled();
+    });
+  });
 
   describe('CARE_MANAGER', () => {
     it('自分が作成した問い合わせは取得できる', async () => {
