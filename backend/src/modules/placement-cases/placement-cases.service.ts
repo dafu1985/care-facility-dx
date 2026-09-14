@@ -44,6 +44,12 @@ import {
 import { FacilityPricing } from '../facilities/entities/facility-pricing.entity';
 import { FacilityRequirement } from '../facilities/entities/facility-requirement.entity';
 
+import { Inquiry, InquiryStatus } from '../inquiries/entities/inquiry.entity';
+
+type CandidateFacilityWithOpenInquiry = CandidateFacility & {
+  openInquiryId: string | null;
+};
+
 @Injectable()
 export class PlacementCasesService {
   constructor(
@@ -76,6 +82,9 @@ export class PlacementCasesService {
 
     @InjectRepository(FacilityRequirement)
     private readonly facilityRequirementRepository: Repository<FacilityRequirement>,
+
+    @InjectRepository(Inquiry)
+    private readonly inquiryRepository: Repository<Inquiry>,
   ) {}
 
   /**
@@ -348,12 +357,11 @@ export class PlacementCasesService {
      * CandidateFacilityを新規作成せず既存レコードを再利用する。
      * これによりcandidateFacilityIdを安定させる。
      */
-    const existingCandidates =
-      await this.candidateFacilityRepository.find({
-        where: {
-          placementCaseId,
-        },
-      });
+    const existingCandidates = await this.candidateFacilityRepository.find({
+      where: {
+        placementCaseId,
+      },
+    });
 
     const candidates: CandidateFacility[] = [];
 
@@ -505,10 +513,7 @@ export class PlacementCasesService {
       candidate.status = CandidateFacilityStatus.DECLINED;
     }
 
-    const candidatesToSave = [
-      ...candidates,
-      ...unmatchedExistingCandidates,
-    ];
+    const candidatesToSave = [...candidates, ...unmatchedExistingCandidates];
 
     if (candidatesToSave.length === 0) {
       return [];
@@ -529,11 +534,12 @@ export class PlacementCasesService {
   async getCandidateFacilities(
     placementCaseId: string,
     user: AuthenticatedUser,
-  ): Promise<CandidateFacility[]> {
+  ): Promise<CandidateFacilityWithOpenInquiry[]> {
     // 自分の案件か確認する。
     await this.findOne(placementCaseId, user);
 
-    return this.candidateFacilityRepository.find({
+    // 案件に紐づく候補施設を取得する。
+    const candidates = await this.candidateFacilityRepository.find({
       where: {
         placementCaseId,
       },
@@ -544,6 +550,48 @@ export class PlacementCasesService {
         matchScore: 'DESC',
         createdAt: 'ASC',
       },
+    });
+
+    if (candidates.length === 0) {
+      return [];
+    }
+
+    const candidateFacilityIds = candidates.map(
+      (candidate) => candidate.candidateFacilityId,
+    );
+
+    /**
+     * 候補施設に紐づく進行中の問い合わせをまとめて取得する。
+     *
+     * 候補施設ごとに個別SQLを発行せず、
+     * CandidateFacility IDをまとめて検索する。
+     */
+    const openInquiries = await this.inquiryRepository.find({
+      where: {
+        candidateFacilityId: In(candidateFacilityIds),
+        status: InquiryStatus.OPEN,
+      },
+      order: {
+        createdAt: 'ASC',
+      },
+    });
+
+    /**
+     * CandidateFacilityごとにOPEN Inquiryを紐付ける。
+     *
+     * 現在DBに過去の重複OPEN Inquiryが存在する可能性があるため、
+     * 複数存在する場合は最初の1件を利用する。
+     */
+    return candidates.map((candidate) => {
+      const openInquiry = openInquiries.find(
+        (inquiry) =>
+          inquiry.candidateFacilityId === candidate.candidateFacilityId,
+      );
+
+      return {
+        ...candidate,
+        openInquiryId: openInquiry?.inquiryId ?? null,
+      };
     });
   }
 

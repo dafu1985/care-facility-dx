@@ -22,6 +22,7 @@ import {
 import { FacilityAvailability } from '../facilities/entities/facility-availability.entity';
 import { FacilityPricing } from '../facilities/entities/facility-pricing.entity';
 import { FacilityRequirement } from '../facilities/entities/facility-requirement.entity';
+import { Inquiry } from '../inquiries/entities/inquiry.entity';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { FacilityRequirement } from '../facilities/entities/facility-requirement
       FacilityAvailability,
       FacilityPricing,
       FacilityRequirement,
+      Inquiry,
     ]),
   ],
   controllers: [PlacementCasesController],

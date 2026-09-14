@@ -45,7 +45,7 @@ export function InquiryCreatePage() {
 
   const [body, setBody] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(Boolean(facilityId));
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,7 +56,6 @@ export function InquiryCreatePage() {
    */
   useEffect(() => {
     if (!facilityId) {
-      setIsLoading(false);
       return;
     }
 

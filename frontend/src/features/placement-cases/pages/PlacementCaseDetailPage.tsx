@@ -37,9 +37,7 @@ import type {
 /**
  * 案件ステータスを画面表示用の日本語へ変換する。
  */
-function getPlacementCaseStatusLabel(
-  status: PlacementCaseStatus,
-): string {
+function getPlacementCaseStatusLabel(status: PlacementCaseStatus): string {
   switch (status) {
     case "SEARCHING":
       return "施設を検索中";
@@ -310,8 +308,9 @@ export function PlacementCaseDetailPage() {
   /**
    * 案件詳細。
    */
-  const [placementCase, setPlacementCase] =
-    useState<PlacementCase | null>(null);
+  const [placementCase, setPlacementCase] = useState<PlacementCase | null>(
+    null,
+  );
 
   /**
    * 利用者条件。
@@ -322,14 +321,16 @@ export function PlacementCaseDetailPage() {
   /**
    * 医療条件一覧。
    */
-  const [medicalRequirements, setMedicalRequirements] =
-    useState<CaseMedicalRequirement[]>([]);
+  const [medicalRequirements, setMedicalRequirements] = useState<
+    CaseMedicalRequirement[]
+  >([]);
 
   /**
    * 候補施設一覧。
    */
-  const [candidateFacilities, setCandidateFacilities] =
-    useState<CandidateFacility[]>([]);
+  const [candidateFacilities, setCandidateFacilities] = useState<
+    CandidateFacility[]
+  >([]);
 
   /**
    * 初期表示の読み込み状態。
@@ -349,14 +350,12 @@ export function PlacementCaseDetailPage() {
   /**
    * マッチングAPIエラー。
    */
-  const [matchingError, setMatchingError] =
-    useState<string | null>(null);
+  const [matchingError, setMatchingError] = useState<string | null>(null);
 
   /**
    * マッチング成功メッセージ。
    */
-  const [matchingMessage, setMatchingMessage] =
-    useState<string | null>(null);
+  const [matchingMessage, setMatchingMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!placementCaseId) {
@@ -405,9 +404,7 @@ export function PlacementCaseDetailPage() {
            */
           setCandidateFacilities(
             [...candidateFacilitiesResponse].sort(
-              (a, b) =>
-                (b.matchScore ?? 0) -
-                (a.matchScore ?? 0),
+              (a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0),
             ),
           );
 
@@ -419,10 +416,7 @@ export function PlacementCaseDetailPage() {
           return;
         }
 
-        console.error(
-          "施設探し案件詳細の取得に失敗しました。",
-          error,
-        );
+        console.error("施設探し案件詳細の取得に失敗しました。", error);
 
         setError(
           "施設探し案件詳細の取得に失敗しました。時間をおいて再度お試しください。",
@@ -460,30 +454,23 @@ export function PlacementCaseDetailPage() {
     try {
       await runPlacementMatching(placementCaseId);
 
-      const latestCandidates =
-        await getCandidateFacilities(placementCaseId);
+      const latestCandidates = await getCandidateFacilities(placementCaseId);
 
       const sortedCandidates = [...latestCandidates].sort(
-        (a, b) =>
-          (b.matchScore ?? 0) - (a.matchScore ?? 0),
+        (a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0),
       );
 
       setCandidateFacilities(sortedCandidates);
 
       if (sortedCandidates.length === 0) {
-        setMatchingMessage(
-          "現在の条件に一致する候補施設はありませんでした。",
-        );
+        setMatchingMessage("現在の条件に一致する候補施設はありませんでした。");
       } else {
         setMatchingMessage(
           `${sortedCandidates.length}件の候補施設が見つかりました。`,
         );
       }
     } catch (error) {
-      console.error(
-        "施設マッチングの実行に失敗しました。",
-        error,
-      );
+      console.error("施設マッチングの実行に失敗しました。", error);
 
       setMatchingError(
         "施設の検索に失敗しました。時間をおいて再度お試しください。",
@@ -505,9 +492,7 @@ export function PlacementCaseDetailPage() {
         }}
       >
         <Stack spacing={2}>
-          <Alert severity="error">
-            案件IDが指定されていません。
-          </Alert>
+          <Alert severity="error">案件IDが指定されていません。</Alert>
 
           <Box>
             <Button
@@ -583,9 +568,7 @@ export function PlacementCaseDetailPage() {
         }}
       >
         <Stack spacing={2}>
-          <Alert severity="warning">
-            案件情報が見つかりませんでした。
-          </Alert>
+          <Alert severity="warning">案件情報が見つかりませんでした。</Alert>
 
           <Box>
             <Button
@@ -639,10 +622,7 @@ export function PlacementCaseDetailPage() {
           }}
         >
           <Box>
-            <Typography
-              variant="h5"
-              component="h1"
-            >
+            <Typography variant="h5" component="h1">
               {placementCase.caseCode}
             </Typography>
 
@@ -658,12 +638,8 @@ export function PlacementCaseDetailPage() {
           </Box>
 
           <Chip
-            label={getPlacementCaseStatusLabel(
-              placementCase.status,
-            )}
-            color={getPlacementCaseStatusColor(
-              placementCase.status,
-            )}
+            label={getPlacementCaseStatusLabel(placementCase.status)}
+            color={getPlacementCaseStatusColor(placementCase.status)}
           />
         </Box>
 
@@ -671,9 +647,7 @@ export function PlacementCaseDetailPage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">
-                案件基本情報
-              </Typography>
+              <Typography variant="h6">案件基本情報</Typography>
 
               <Divider />
 
@@ -685,23 +659,17 @@ export function PlacementCaseDetailPage() {
 
                 <Typography>
                   <strong>ステータス：</strong>
-                  {getPlacementCaseStatusLabel(
-                    placementCase.status,
-                  )}
+                  {getPlacementCaseStatusLabel(placementCase.status)}
                 </Typography>
 
                 <Typography>
                   <strong>入居希望日：</strong>
-                  {formatDate(
-                    placementCase.desiredMoveInDate,
-                  )}
+                  {formatDate(placementCase.desiredMoveInDate)}
                 </Typography>
 
                 <Typography>
                   <strong>緊急度：</strong>
-                  {getUrgencyLabel(
-                    placementCase.urgency,
-                  )}
+                  {getUrgencyLabel(placementCase.urgency)}
                 </Typography>
 
                 <Typography>
@@ -709,18 +677,12 @@ export function PlacementCaseDetailPage() {
                   {placementCase.note ?? "未設定"}
                 </Typography>
 
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                >
+                <Typography variant="body2" color="text.secondary">
                   作成日：
                   {formatDate(placementCase.createdAt)}
                 </Typography>
 
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                >
+                <Typography variant="body2" color="text.secondary">
                   最終更新：
                   {formatDate(placementCase.updatedAt)}
                 </Typography>
@@ -733,9 +695,7 @@ export function PlacementCaseDetailPage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">
-                利用者条件
-              </Typography>
+              <Typography variant="h6">利用者条件</Typography>
 
               <Divider />
 
@@ -756,71 +716,52 @@ export function PlacementCaseDetailPage() {
                 >
                   <Typography>
                     <strong>年代：</strong>
-                    {getAgeGroupLabel(
-                      clientCondition.ageGroup,
-                    )}
+                    {getAgeGroupLabel(clientCondition.ageGroup)}
                   </Typography>
 
                   <Typography>
                     <strong>性別：</strong>
-                    {getGenderLabel(
-                      clientCondition.gender,
-                    )}
+                    {getGenderLabel(clientCondition.gender)}
                   </Typography>
 
                   <Typography>
                     <strong>要介護度：</strong>
-                    {getCareLevelLabel(
-                      clientCondition.careLevel,
-                    )}
+                    {getCareLevelLabel(clientCondition.careLevel)}
                   </Typography>
 
                   <Typography>
                     <strong>月額予算上限：</strong>
-                    {formatCurrency(
-                      clientCondition.budgetMax,
-                    )}
+                    {formatCurrency(clientCondition.budgetMax)}
                   </Typography>
 
                   <Typography>
                     <strong>希望地域：</strong>
-                    {clientCondition.desiredArea ??
-                      "未設定"}
+                    {clientCondition.desiredArea ?? "未設定"}
                   </Typography>
 
                   <Typography>
                     <strong>生活保護：</strong>
-                    {getBooleanLabel(
-                      clientCondition.publicAssistance,
-                    )}
+                    {getBooleanLabel(clientCondition.publicAssistance)}
                   </Typography>
 
                   <Typography>
                     <strong>身元保証人：</strong>
-                    {getBooleanLabel(
-                      clientCondition.guarantorAvailable,
-                    )}
+                    {getBooleanLabel(clientCondition.guarantorAvailable)}
                   </Typography>
 
                   <Typography>
                     <strong>認知症：</strong>
-                    {getBooleanLabel(
-                      clientCondition.dementia,
-                    )}
+                    {getBooleanLabel(clientCondition.dementia)}
                   </Typography>
 
                   <Typography>
                     <strong>看取り希望：</strong>
-                    {getBooleanLabel(
-                      clientCondition.endOfLifeCare,
-                    )}
+                    {getBooleanLabel(clientCondition.endOfLifeCare)}
                   </Typography>
 
                   <Typography>
                     <strong>入居希望日：</strong>
-                    {formatDate(
-                      clientCondition.desiredMoveInDate,
-                    )}
+                    {formatDate(clientCondition.desiredMoveInDate)}
                   </Typography>
                 </Box>
               )}
@@ -832,70 +773,55 @@ export function PlacementCaseDetailPage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">
-                医療条件
-              </Typography>
+              <Typography variant="h6">医療条件</Typography>
 
               <Divider />
 
               {medicalRequirements.length === 0 ? (
-                <Alert severity="info">
-                  医療条件は登録されていません。
-                </Alert>
+                <Alert severity="info">医療条件は登録されていません。</Alert>
               ) : (
                 <Stack spacing={1.5}>
-                  {medicalRequirements.map(
-                    (requirement) => (
-                      <Box
-                        key={
-                          requirement.caseMedicalRequirementId
-                        }
-                        sx={{
-                          display: "flex",
-                          justifyContent:
-                            "space-between",
-                          alignItems: {
-                            xs: "flex-start",
-                            sm: "center",
-                          },
-                          flexDirection: {
-                            xs: "column",
-                            sm: "row",
-                          },
-                          gap: 1,
-                          py: 1,
-                        }}
-                      >
-                        <Box>
-                          <Typography sx={{ fontWeight: 600 }}>
-                            {
-                              requirement
-                                .medicalCondition.name
-                            }
+                  {medicalRequirements.map((requirement) => (
+                    <Box
+                      key={requirement.caseMedicalRequirementId}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: {
+                          xs: "flex-start",
+                          sm: "center",
+                        },
+                        flexDirection: {
+                          xs: "column",
+                          sm: "row",
+                        },
+                        gap: 1,
+                        py: 1,
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {requirement.medicalCondition.name}
+                        </Typography>
+
+                        {requirement.note && (
+                          <Typography variant="body2" color="text.secondary">
+                            {requirement.note}
                           </Typography>
-
-                          {requirement.note && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                            >
-                              {requirement.note}
-                            </Typography>
-                          )}
-                        </Box>
-
-                        <Chip
-                          size="small"
-                          label={getMedicalRequirementLevelLabel(
-                            requirement.requirementLevel,
-                          )}
-                          color={getMedicalRequirementLevelColor(
-                            requirement.requirementLevel,
-                          )}
-                        />
+                        )}
                       </Box>
-                    ),
-                  )}
+
+                      <Chip
+                        size="small"
+                        label={getMedicalRequirementLevelLabel(
+                          requirement.requirementLevel,
+                        )}
+                        color={getMedicalRequirementLevelColor(
+                          requirement.requirementLevel,
+                        )}
+                      />
+                    </Box>
+                  ))}
                 </Stack>
               )}
             </Stack>
@@ -922,9 +848,7 @@ export function PlacementCaseDetailPage() {
                 }}
               >
                 <Box>
-                  <Typography variant="h6">
-                    候補施設
-                  </Typography>
+                  <Typography variant="h6">候補施設</Typography>
 
                   <Typography
                     variant="body2"
@@ -944,27 +868,17 @@ export function PlacementCaseDetailPage() {
                     void handleRunMatching();
                   }}
                 >
-                  {isMatching
-                    ? "検索中..."
-                    : "施設を検索"}
+                  {isMatching ? "検索中..." : "施設を検索"}
                 </Button>
               </Box>
 
               <Divider />
 
-              {matchingError && (
-                <Alert severity="error">
-                  {matchingError}
-                </Alert>
-              )}
+              {matchingError && <Alert severity="error">{matchingError}</Alert>}
 
               {matchingMessage && (
                 <Alert
-                  severity={
-                    candidateFacilities.length > 0
-                      ? "success"
-                      : "info"
-                  }
+                  severity={candidateFacilities.length > 0 ? "success" : "info"}
                 >
                   {matchingMessage}
                 </Alert>
@@ -982,162 +896,150 @@ export function PlacementCaseDetailPage() {
                 </Box>
               )}
 
-              {!isMatching &&
-                candidateFacilities.length === 0 && (
-                  <Alert severity="info">
-                    候補施設はまだありません。「施設を検索」を押してマッチングを実行してください。
-                  </Alert>
-                )}
+              {!isMatching && candidateFacilities.length === 0 && (
+                <Alert severity="info">
+                  候補施設はまだありません。「施設を検索」を押してマッチングを実行してください。
+                </Alert>
+              )}
 
-              {!isMatching &&
-                candidateFacilities.length > 0 && (
-                  <Stack spacing={2}>
-                    {candidateFacilities.map(
-                      (candidate) => (
-                        <Card
-                          key={
-                            candidate.candidateFacilityId
-                          }
-                          variant="outlined"
-                        >
-                          <CardContent>
-                            <Stack spacing={2}>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  justifyContent:
-                                    "space-between",
-                                  alignItems: {
-                                    xs: "flex-start",
-                                    sm: "center",
-                                  },
-                                  flexDirection: {
-                                    xs: "column",
-                                    sm: "row",
-                                  },
-                                  gap: 1,
+              {!isMatching && candidateFacilities.length > 0 && (
+                <Stack spacing={2}>
+                  {candidateFacilities.map((candidate) => (
+                    <Card
+                      key={candidate.candidateFacilityId}
+                      variant="outlined"
+                    >
+                      <CardContent>
+                        <Stack spacing={2}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: {
+                                xs: "flex-start",
+                                sm: "center",
+                              },
+                              flexDirection: {
+                                xs: "column",
+                                sm: "row",
+                              },
+                              gap: 1,
+                            }}
+                          >
+                            <Box>
+                              <Typography variant="h6" component="h3">
+                                {candidate.facility?.name ?? "施設名不明"}
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                {candidate.facility?.area ?? "エリア未設定"}
+                              </Typography>
+                            </Box>
+
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{
+                                alignItems: "center",
+                              }}
+                            >
+                              <Chip
+                                label={`マッチスコア ${candidate.matchScore ?? 0}`}
+                                color="primary"
+                              />
+
+                              <Chip
+                                label={getCandidateFacilityStatusLabel(
+                                  candidate.status,
+                                )}
+                                color={getCandidateFacilityStatusColor(
+                                  candidate.status,
+                                )}
+                                variant="outlined"
+                              />
+                            </Stack>
+                          </Box>
+
+                          <Divider />
+
+                          <Stack spacing={1}>
+                            <Typography>
+                              <strong>住所：</strong>
+                              {candidate.facility?.address ?? "未設定"}
+                            </Typography>
+
+                            <Typography>
+                              <strong>電話番号：</strong>
+                              {candidate.facility?.phone ?? "未設定"}
+                            </Typography>
+
+                            {candidate.note && (
+                              <Typography>
+                                <strong>メモ：</strong>
+                                {candidate.note}
+                              </Typography>
+                            )}
+                          </Stack>
+
+                          {candidate.facility && (
+                            <Stack
+                              direction={{
+                                xs: "column",
+                                sm: "row",
+                              }}
+                              spacing={1}
+                            >
+                              <Button
+                                variant="outlined"
+                                onClick={() => {
+                                  navigate(
+                                    `/facilities/${candidate.facility!.facilityId}`,
+                                  );
                                 }}
                               >
-                                <Box>
-                                  <Typography
-                                    variant="h6"
-                                    component="h3"
-                                  >
-                                    {candidate.facility
-                                      ?.name ??
-                                      "施設名不明"}
-                                  </Typography>
+                                施設詳細を見る
+                              </Button>
 
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    {candidate.facility
-                                      ?.area ??
-                                      "エリア未設定"}
-                                  </Typography>
-                                </Box>
-
-                                <Stack
-                                  direction="row"
-                                  spacing={1}
-                                  sx={{
-                                    alignItems: "center",
+                              {candidate.openInquiryId ? (
+                                <Button
+                                  variant="contained"
+                                  onClick={() => {
+                                    navigate(
+                                      `/inquiries/${candidate.openInquiryId}`,
+                                    );
                                   }}
                                 >
-                                  <Chip
-                                    label={`マッチスコア ${candidate.matchScore ?? 0}`}
-                                    color="primary"
-                                  />
+                                  問い合わせを見る
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="contained"
+                                  onClick={() => {
+                                    const searchParams = new URLSearchParams({
+                                      placementCaseId,
+                                      candidateFacilityId:
+                                        candidate.candidateFacilityId,
+                                    });
 
-                                  <Chip
-                                    label={getCandidateFacilityStatusLabel(
-                                      candidate.status,
-                                    )}
-                                    color={getCandidateFacilityStatusColor(
-                                      candidate.status,
-                                    )}
-                                    variant="outlined"
-                                  />
-                                </Stack>
-                              </Box>
-
-                              <Divider />
-
-                              <Stack spacing={1}>
-                                <Typography>
-                                  <strong>
-                                    住所：
-                                  </strong>
-                                  {candidate.facility
-                                    ?.address ??
-                                    "未設定"}
-                                </Typography>
-
-                                <Typography>
-                                  <strong>
-                                    電話番号：
-                                  </strong>
-                                  {candidate.facility
-                                    ?.phone ??
-                                    "未設定"}
-                                </Typography>
-
-                                {candidate.note && (
-                                  <Typography>
-                                    <strong>
-                                      メモ：
-                                    </strong>
-                                    {candidate.note}
-                                  </Typography>
-                                )}
-                              </Stack>
-
-                              {candidate.facility && (
-                                <Stack
-                                  direction={{
-                                    xs: "column",
-                                    sm: "row",
+                                    navigate(
+                                      `/facilities/${candidate.facility!.facilityId}/inquiry?${searchParams.toString()}`,
+                                    );
                                   }}
-                                  spacing={1}
                                 >
-                                  <Button
-                                    variant="outlined"
-                                    onClick={() => {
-                                      navigate(
-                                        `/facilities/${candidate.facility!.facilityId}`,
-                                      );
-                                    }}
-                                  >
-                                    施設詳細を見る
-                                  </Button>
-
-                                  <Button
-                                    variant="contained"
-                                    onClick={() => {
-                                      const searchParams =
-                                        new URLSearchParams({
-                                          placementCaseId,
-                                          candidateFacilityId:
-                                            candidate.candidateFacilityId,
-                                        });
-
-                                      navigate(
-                                        `/facilities/${candidate.facility!.facilityId}/inquiry?${searchParams.toString()}`,
-                                      );
-                                    }}
-                                  >
-                                    この施設に問い合わせる
-                                  </Button>
-                                </Stack>
+                                  この施設に問い合わせる
+                                </Button>
                               )}
                             </Stack>
-                          </CardContent>
-                        </Card>
-                      ),
-                    )}
-                  </Stack>
-                )}
+                          )}
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
             </Stack>
           </CardContent>
         </Card>
@@ -1145,6 +1047,3 @@ export function PlacementCaseDetailPage() {
     </Container>
   );
 }
-
-
-
