@@ -5,7 +5,7 @@
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import {
@@ -148,13 +148,17 @@ export class InquiriesService {
         const existingInquiry = await inquiryRepository.findOne({
           where: {
             candidateFacilityId: dto.candidateFacilityId,
-            status: InquiryStatus.OPEN,
+            status: In([
+              InquiryStatus.OPEN,
+              InquiryStatus.IN_PROGRESS,
+              InquiryStatus.ANSWERED,
+            ]),
           },
         });
 
         if (existingInquiry) {
           throw new ConflictException(
-            'An open inquiry already exists for this candidate facility',
+            'An active inquiry already exists for this candidate facility',
           );
         }
       }

@@ -46,8 +46,8 @@ import { FacilityRequirement } from '../facilities/entities/facility-requirement
 
 import { Inquiry, InquiryStatus } from '../inquiries/entities/inquiry.entity';
 
-type CandidateFacilityWithOpenInquiry = CandidateFacility & {
-  openInquiryId: string | null;
+type CandidateFacilityWithActiveInquiry = CandidateFacility & {
+  activeInquiryId: string | null;
 };
 
 @Injectable()
@@ -534,7 +534,7 @@ export class PlacementCasesService {
   async getCandidateFacilities(
     placementCaseId: string,
     user: AuthenticatedUser,
-  ): Promise<CandidateFacilityWithOpenInquiry[]> {
+  ): Promise<CandidateFacilityWithActiveInquiry[]> {
     // 自分の案件か確認する。
     await this.findOne(placementCaseId, user);
 
@@ -566,10 +566,14 @@ export class PlacementCasesService {
      * 候補施設ごとに個別SQLを発行せず、
      * CandidateFacility IDをまとめて検索する。
      */
-    const openInquiries = await this.inquiryRepository.find({
+    const activeInquiries = await this.inquiryRepository.find({
       where: {
         candidateFacilityId: In(candidateFacilityIds),
-        status: InquiryStatus.OPEN,
+        status: In([
+          InquiryStatus.OPEN,
+          InquiryStatus.IN_PROGRESS,
+          InquiryStatus.ANSWERED,
+        ]),
       },
       order: {
         createdAt: 'ASC',
@@ -577,20 +581,23 @@ export class PlacementCasesService {
     });
 
     /**
-     * CandidateFacilityごとにOPEN Inquiryを紐付ける。
+     * CandidateFacilityごとにACTIVE Inquiryを紐付ける。
      *
-     * 現在DBに過去の重複OPEN Inquiryが存在する可能性があるため、
+     * ACTIVEとして扱うステータス:
+     * OPEN / IN_PROGRESS / ANSWERED
+     *
+     * 現在DBに過去の重複Inquiryが存在する可能性があるため、
      * 複数存在する場合は最初の1件を利用する。
      */
     return candidates.map((candidate) => {
-      const openInquiry = openInquiries.find(
+      const activeInquiry = activeInquiries.find(
         (inquiry) =>
           inquiry.candidateFacilityId === candidate.candidateFacilityId,
       );
 
       return {
         ...candidate,
-        openInquiryId: openInquiry?.inquiryId ?? null,
+        activeInquiryId: activeInquiry?.inquiryId ?? null,
       };
     });
   }

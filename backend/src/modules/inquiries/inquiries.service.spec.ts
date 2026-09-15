@@ -9,6 +9,7 @@ import {
   EntityManager,
   FindManyOptions,
   FindOneOptions,
+  In,
 } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
@@ -330,58 +331,116 @@ describe('InquiriesService authorization', () => {
   };
 
   describe('create duplicate inquiry', () => {
-    it('同じ候補施設にOPENな問い合わせが存在する場合は409になる', async () => {
-      const placementCaseId = '4d3b87cb-5096-4b26-be90-0ff915b1d6d2';
-      const candidateFacilityId = 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7';
+    const placementCaseId = '4d3b87cb-5096-4b26-be90-0ff915b1d6d2';
+    const candidateFacilityId = 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7';
 
-      const placementCase = {
-        placementCaseId,
-        careManagerId: careManagerUser.userId,
-      } as PlacementCase;
+    const placementCase = {
+      placementCaseId,
+      careManagerId: careManagerUser.userId,
+    } as PlacementCase;
 
-      const candidateFacility = {
-        candidateFacilityId,
-        placementCaseId,
-        facilityId: ownInquiry.facilityId,
-      } as CandidateFacility;
+    const candidateFacility = {
+      candidateFacilityId,
+      placementCaseId,
+      facilityId: ownInquiry.facilityId,
+    } as CandidateFacility;
 
-      const existingOpenInquiry: Inquiry = {
+    const createDto = {
+      facilityId: ownInquiry.facilityId,
+      placementCaseId,
+      candidateFacilityId,
+      subject: '重複問い合わせテスト',
+      body: '同じ候補施設への進行中問い合わせは重複作成できないことを確認します。',
+    };
+
+    const setupCreateRepositories = () => {
+      placementCaseRepository.findOne.mockResolvedValue(placementCase);
+      candidateFacilityRepository.findOne.mockResolvedValue(candidateFacility);
+    };
+
+    it.each([
+      InquiryStatus.OPEN,
+      InquiryStatus.IN_PROGRESS,
+      InquiryStatus.ANSWERED,
+    ])(
+      '同じ候補施設に%sな問い合わせが存在する場合は409になる',
+      async (status) => {
+        setupCreateRepositories();
+
+        const existingActiveInquiry: Inquiry = {
+          ...ownInquiry,
+          inquiryId: '441a3919-ffc5-4cf8-81d3-bed4db91c694',
+          placementCaseId,
+          candidateFacilityId,
+          status,
+        };
+
+        inquiryRepository.findOne.mockResolvedValue(existingActiveInquiry);
+
+        await expect(
+          service.create(createDto, careManagerUser),
+        ).rejects.toBeInstanceOf(ConflictException);
+
+        expect(inquiryRepository.findOne).toHaveBeenCalledWith({
+          where: {
+            candidateFacilityId,
+            status: In([
+              InquiryStatus.OPEN,
+              InquiryStatus.IN_PROGRESS,
+              InquiryStatus.ANSWERED,
+            ]),
+          },
+        });
+
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+        expect(candidateFacilityRepository.save).not.toHaveBeenCalled();
+        expect(placementCaseRepository.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('ACTIVEな問い合わせが存在しない場合は新しい問い合わせを作成できる', async () => {
+      setupCreateRepositories();
+      inquiryRepository.findOne.mockResolvedValue(null);
+
+      const savedInquiry: Inquiry = {
         ...ownInquiry,
-        inquiryId: '441a3919-ffc5-4cf8-81d3-bed4db91c694',
+        inquiryId: '55555555-5555-4555-8555-555555555555',
         placementCaseId,
         candidateFacilityId,
+        subject: createDto.subject,
         status: InquiryStatus.OPEN,
       };
 
-      placementCaseRepository.findOne.mockResolvedValue(placementCase);
-      candidateFacilityRepository.findOne.mockResolvedValue(candidateFacility);
-      inquiryRepository.findOne.mockResolvedValue(existingOpenInquiry);
+      inquiryRepository.create = jest
+        .fn<(inquiry: Partial<Inquiry>) => Inquiry>()
+        .mockReturnValue(savedInquiry);
+      inquiryRepository.save.mockResolvedValue(savedInquiry);
 
-      await expect(
-        service.create(
-          {
-            facilityId: ownInquiry.facilityId,
-            placementCaseId,
-            candidateFacilityId,
-            subject: '重複問い合わせテスト',
-            body: '同じ候補施設へのOPEN問い合わせは作成できないことを確認します。',
-          },
-          careManagerUser,
-        ),
-      ).rejects.toBeInstanceOf(ConflictException);
+      const firstMessage: InquiryMessage = {
+        messageId: '66666666-6666-4666-8666-666666666666',
+        inquiryId: savedInquiry.inquiryId,
+        senderUserId: careManagerUser.userId,
+        type: InquiryMessageType.MESSAGE,
+        body: createDto.body,
+        createdAt: new Date(),
+        inquiry: undefined as never,
+        senderUser: undefined as never,
+      };
 
-      expect(inquiryRepository.findOne).toHaveBeenCalledWith({
-        where: {
-          candidateFacilityId,
-          status: InquiryStatus.OPEN,
-        },
-      });
+      inquiryMessageRepository.create.mockReturnValue(firstMessage);
+      inquiryMessageRepository.save.mockResolvedValue(firstMessage);
+      candidateFacilityRepository.save.mockResolvedValue(candidateFacility);
+      placementCaseRepository.save.mockResolvedValue(placementCase);
 
-      expect(inquiryRepository.save).not.toHaveBeenCalled();
-      expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
-      expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
-      expect(candidateFacilityRepository.save).not.toHaveBeenCalled();
-      expect(placementCaseRepository.save).not.toHaveBeenCalled();
+      const result = await service.create(createDto, careManagerUser);
+
+      expect(result.inquiryId).toBe(savedInquiry.inquiryId);
+      expect(inquiryRepository.save).toHaveBeenCalled();
+      expect(inquiryMessageRepository.save).toHaveBeenCalled();
+      expect(candidateFacilityRepository.save).toHaveBeenCalled();
+      expect(placementCaseRepository.save).toHaveBeenCalled();
     });
   });
 

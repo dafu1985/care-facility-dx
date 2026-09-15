@@ -41,5 +41,5 @@ export interface CandidateFacility {
   createdAt: string;
   updatedAt: string;
   facility?: CandidateFacilityDetail;
-  openInquiryId: string | null;
+  activeInquiryId: string | null;
 }

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { In } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import {
   Facility,
   FacilityStatus,
 } from '../facilities/entities/facility.entity';
+import { Inquiry, InquiryStatus } from '../inquiries/entities/inquiry.entity';
 import { UserRole } from '../users/entities/user.entity';
 
 import {
@@ -21,6 +23,7 @@ describe('PlacementCasesService matching', () => {
   const placementCaseId = '4d3b87cb-5096-4b26-be90-0ff915b1d6d2';
   const facilityId = '5ea06a45-7587-4198-b94c-56e0044399c7';
   const candidateFacilityId = 'b0ebacd6-4f0a-4dbc-a9b7-4bf8509470b7';
+  const inquiryId = '5ddaf599-93c5-40ec-bc1e-ced92540882b';
   const careManagerId = '01541a48-ac15-4279-ac45-166b923f14c9';
 
   const placementCaseRepository = {
@@ -63,6 +66,10 @@ describe('PlacementCasesService matching', () => {
     findOne: jest.fn(),
   };
 
+  const inquiryRepository = {
+    find: jest.fn(),
+  };
+
   let service: PlacementCasesService;
 
   const user: AuthenticatedUser = {
@@ -97,6 +104,18 @@ describe('PlacementCasesService matching', () => {
     updatedAt: new Date('2026-09-11T00:00:00.000Z'),
   } as Facility;
 
+  const candidate = {
+    candidateFacilityId,
+    placementCaseId,
+    facilityId,
+    matchScore: 35,
+    status: CandidateFacilityStatus.INQUIRING,
+    note: '問い合わせ中の候補',
+    createdAt: new Date('2026-09-11T00:00:00.000Z'),
+    updatedAt: new Date('2026-09-11T00:00:00.000Z'),
+    facility,
+  } as CandidateFacility;
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -111,6 +130,7 @@ describe('PlacementCasesService matching', () => {
       facilityAvailabilityRepository as never,
       facilityPricingRepository as never,
       facilityRequirementRepository as never,
+      inquiryRepository as never,
     );
 
     placementCaseRepository.findOne.mockResolvedValue(placementCase);
@@ -144,7 +164,6 @@ describe('PlacementCasesService matching', () => {
     const result = await service.runMatching(placementCaseId, user);
 
     expect(result).toHaveLength(1);
-
     expect(result[0].candidateFacilityId).toBe(candidateFacilityId);
     expect(result[0].status).toBe(CandidateFacilityStatus.INQUIRING);
     expect(result[0].note).toBe('問い合わせ中の候補');
@@ -158,5 +177,67 @@ describe('PlacementCasesService matching', () => {
     expect(candidateFacilityRepository.save).toHaveBeenCalledWith([
       existingCandidate,
     ]);
+  });
+
+  describe('getCandidateFacilities active inquiry', () => {
+    it.each([
+      InquiryStatus.OPEN,
+      InquiryStatus.IN_PROGRESS,
+      InquiryStatus.ANSWERED,
+    ])(
+      '%s の問い合わせが存在する場合はactiveInquiryIdを返す',
+      async (status) => {
+        candidateFacilityRepository.find.mockResolvedValue([candidate]);
+
+        const activeInquiry = {
+          inquiryId,
+          candidateFacilityId,
+          status,
+          createdAt: new Date('2026-09-11T01:00:00.000Z'),
+        } as Inquiry;
+
+        inquiryRepository.find.mockResolvedValue([activeInquiry]);
+
+        const result = await service.getCandidateFacilities(
+          placementCaseId,
+          user,
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result[0].activeInquiryId).toBe(inquiryId);
+
+        expect(inquiryRepository.find).toHaveBeenCalledWith({
+          where: {
+            candidateFacilityId: In([candidateFacilityId]),
+            status: In([
+              InquiryStatus.OPEN,
+              InquiryStatus.IN_PROGRESS,
+              InquiryStatus.ANSWERED,
+            ]),
+          },
+          order: {
+            createdAt: 'ASC',
+          },
+        });
+      },
+    );
+
+    it.each([InquiryStatus.CLOSED, InquiryStatus.CANCELLED])(
+      '%s はACTIVE対象外なのでactiveInquiryIdはnullになる',
+      async () => {
+        candidateFacilityRepository.find.mockResolvedValue([candidate]);
+
+        // Repository側のACTIVE条件に一致しないため、問い合わせは取得されない。
+        inquiryRepository.find.mockResolvedValue([]);
+
+        const result = await service.getCandidateFacilities(
+          placementCaseId,
+          user,
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result[0].activeInquiryId).toBeNull();
+      },
+    );
   });
 });

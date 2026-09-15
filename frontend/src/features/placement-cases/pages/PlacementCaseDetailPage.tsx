@@ -1003,12 +1003,12 @@ export function PlacementCaseDetailPage() {
                                 施設詳細を見る
                               </Button>
 
-                              {candidate.openInquiryId ? (
+                              {candidate.activeInquiryId ? (
                                 <Button
                                   variant="contained"
                                   onClick={() => {
                                     navigate(
-                                      `/inquiries/${candidate.openInquiryId}`,
+                                      `/inquiries/${candidate.activeInquiryId}`,
                                     );
                                   }}
                                 >
