@@ -437,7 +437,13 @@ export function InquiryDetailPage() {
                             opacity: 0.8,
                           }}
                         >
-                          {isOwnMessage ? "施設" : "ケアマネ"}
+                          {isOwnMessage
+                            ? currentUser?.role === "FACILITY"
+                              ? "施設"
+                              : "ケアマネ"
+                            : currentUser?.role === "FACILITY"
+                              ? "ケアマネ"
+                              : "施設"}
                         </Typography>
 
                         <Typography

@@ -803,292 +803,316 @@ describe('InquiriesService authorization', () => {
   });
 
   describe('updateStatus authorization', () => {
-    const updateStatusDto = {
-      status: InquiryStatus.ANSWERED,
+    const setupFacilityAssignment = () => {
+      facilityStaffRepository.findOne.mockResolvedValue({
+        facilityStaffId: '11111111-1111-4111-8111-111111111111',
+        userId: facilityUser.userId,
+        facilityId: ownInquiry.facilityId,
+        role: FacilityStaffRole.MANAGER,
+        status: FacilityStaffStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: undefined as never,
+        facility: undefined as never,
+      });
     };
 
-    /**
-     * updateStatus成功用の共通モック。
-     *
-     * OPEN → ANSWERED の実際のステータス変更を再現する。
-     */
-    const setupUpdateStatusSuccess = () => {
+    const setupUpdateStatusSuccess = (
+      currentStatus: InquiryStatus,
+      nextStatus: InquiryStatus,
+    ) => {
       const inquiryBeforeUpdate: Inquiry = {
         ...ownInquiry,
-        status: InquiryStatus.OPEN,
+        status: currentStatus,
       };
 
       inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
-
       inquiryRepository.save.mockImplementation(
         async (inquiry: Inquiry) => inquiry,
       );
 
       const statusMessage: InquiryMessage = {
         messageId: '33333333-3333-4333-8333-333333333333',
-
         inquiryId: inquiryBeforeUpdate.inquiryId,
-
         senderUserId: null,
-
         type: InquiryMessageType.STATUS_CHANGE,
-
-        body: 'Status changed from OPEN to ANSWERED',
-
+        body: `Status changed from ${currentStatus} to ${nextStatus}`,
         createdAt: new Date(),
-
         inquiry: undefined as never,
-
         senderUser: null,
       };
 
       inquiryMessageRepository.create.mockReturnValue(statusMessage);
-
       inquiryMessageRepository.save.mockResolvedValue(statusMessage);
 
-      /**
-       * updateStatus()最後のfindOne()では、
-       * 更新後のANSWERED状態を返す。
-       */
       mockFindOneQueryBuilder({
         ...inquiryBeforeUpdate,
-        status: InquiryStatus.ANSWERED,
+        status: nextStatus,
       });
 
-      return {
-        inquiryBeforeUpdate,
-        statusMessage,
-      };
+      return { inquiryBeforeUpdate, statusMessage };
     };
 
-    it('FACILITYは自施設宛のステータスを更新できる', async () => {
-      const { inquiryBeforeUpdate } = setupUpdateStatusSuccess();
+    describe('FACILITY status transition', () => {
+      it('OPEN → IN_PROGRESS は許可される', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.OPEN,
+          InquiryStatus.IN_PROGRESS,
+        );
+        setupFacilityAssignment();
 
-      facilityStaffRepository.findOne.mockResolvedValue({
-        facilityStaffId: '11111111-1111-4111-8111-111111111111',
+        const result = await service.updateStatus(
+          inquiryBeforeUpdate.inquiryId,
+          { status: InquiryStatus.IN_PROGRESS },
+          facilityUser,
+        );
 
-        userId: facilityUser.userId,
-
-        facilityId: inquiryBeforeUpdate.facilityId,
-
-        role: FacilityStaffRole.MANAGER,
-
-        status: FacilityStaffStatus.ACTIVE,
-
-        createdAt: new Date(),
-
-        updatedAt: new Date(),
-
-        user: undefined as never,
-
-        facility: undefined as never,
+        expect(result.status).toBe(InquiryStatus.IN_PROGRESS);
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith({
+          inquiryId: inquiryBeforeUpdate.inquiryId,
+          senderUserId: null,
+          type: InquiryMessageType.STATUS_CHANGE,
+          body: 'Status changed from OPEN to IN_PROGRESS',
+        });
       });
 
-      const result = await service.updateStatus(
-        inquiryBeforeUpdate.inquiryId,
-        updateStatusDto,
-        facilityUser,
-      );
+      it('IN_PROGRESS → ANSWERED は許可される', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.IN_PROGRESS,
+          InquiryStatus.ANSWERED,
+        );
+        setupFacilityAssignment();
 
-      expect(result.status).toBe(InquiryStatus.ANSWERED);
-
-      expect(inquiryMessageRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          inquiryId: inquiryBeforeUpdate.inquiryId,
-
-          senderUserId: null,
-
-          type: InquiryMessageType.STATUS_CHANGE,
-        }),
-      );
-    });
-
-    it('FACILITYは他施設宛のステータスを更新できない', async () => {
-      const inquiryBeforeUpdate: Inquiry = {
-        ...ownInquiry,
-        status: InquiryStatus.OPEN,
-      };
-
-      inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
-
-      facilityStaffRepository.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.updateStatus(
+        const result = await service.updateStatus(
           inquiryBeforeUpdate.inquiryId,
-          updateStatusDto,
+          { status: InquiryStatus.ANSWERED },
           facilityUser,
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+        );
 
-      expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+        expect(result.status).toBe(InquiryStatus.ANSWERED);
+      });
+
+      it('OPEN → ANSWERED は403になる', async () => {
+        const inquiryBeforeUpdate: Inquiry = {
+          ...ownInquiry,
+          status: InquiryStatus.OPEN,
+        };
+        inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
+        setupFacilityAssignment();
+
+        await expect(
+          service.updateStatus(
+            inquiryBeforeUpdate.inquiryId,
+            { status: InquiryStatus.ANSWERED },
+            facilityUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('ANSWERED → CLOSED は403になる', async () => {
+        const inquiryBeforeUpdate: Inquiry = {
+          ...ownInquiry,
+          status: InquiryStatus.ANSWERED,
+        };
+        inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
+        setupFacilityAssignment();
+
+        await expect(
+          service.updateStatus(
+            inquiryBeforeUpdate.inquiryId,
+            { status: InquiryStatus.CLOSED },
+            facilityUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('他施設宛の問い合わせは許可された遷移でも403になる', async () => {
+        const inquiryBeforeUpdate: Inquiry = {
+          ...ownInquiry,
+          status: InquiryStatus.OPEN,
+        };
+        inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
+        facilityStaffRepository.findOne.mockResolvedValue(null);
+
+        await expect(
+          service.updateStatus(
+            inquiryBeforeUpdate.inquiryId,
+            { status: InquiryStatus.IN_PROGRESS },
+            facilityUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
     });
 
-    it('ADMINは問い合わせステータスを更新できる', async () => {
-      const { inquiryBeforeUpdate } = setupUpdateStatusSuccess();
+    describe('CARE_MANAGER status transition', () => {
+      it('ANSWERED → CLOSED は許可される', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.ANSWERED,
+          InquiryStatus.CLOSED,
+        );
 
-      const result = await service.updateStatus(
-        inquiryBeforeUpdate.inquiryId,
-        updateStatusDto,
-        adminUser,
-      );
+        const result = await service.updateStatus(
+          inquiryBeforeUpdate.inquiryId,
+          { status: InquiryStatus.CLOSED },
+          careManagerUser,
+        );
 
-      expect(result.status).toBe(InquiryStatus.ANSWERED);
+        expect(result.status).toBe(InquiryStatus.CLOSED);
+      });
 
-      expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      it('OPEN → CANCELLED は許可される', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.OPEN,
+          InquiryStatus.CANCELLED,
+        );
+
+        const result = await service.updateStatus(
+          inquiryBeforeUpdate.inquiryId,
+          { status: InquiryStatus.CANCELLED },
+          careManagerUser,
+        );
+
+        expect(result.status).toBe(InquiryStatus.CANCELLED);
+      });
+
+      it('IN_PROGRESS → CANCELLED は許可される', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.IN_PROGRESS,
+          InquiryStatus.CANCELLED,
+        );
+
+        const result = await service.updateStatus(
+          inquiryBeforeUpdate.inquiryId,
+          { status: InquiryStatus.CANCELLED },
+          careManagerUser,
+        );
+
+        expect(result.status).toBe(InquiryStatus.CANCELLED);
+      });
+
+      it('OPEN → IN_PROGRESS は403になる', async () => {
+        const inquiryBeforeUpdate: Inquiry = {
+          ...ownInquiry,
+          status: InquiryStatus.OPEN,
+        };
+        inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
+
+        await expect(
+          service.updateStatus(
+            inquiryBeforeUpdate.inquiryId,
+            { status: InquiryStatus.IN_PROGRESS },
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('ADMIN status transition', () => {
+      it('任意のステータス遷移を実行できる', async () => {
+        const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+          InquiryStatus.OPEN,
+          InquiryStatus.ANSWERED,
+        );
+
+        const result = await service.updateStatus(
+          inquiryBeforeUpdate.inquiryId,
+          { status: InquiryStatus.ANSWERED },
+          adminUser,
+        );
+
+        expect(result.status).toBe(InquiryStatus.ANSWERED);
+        expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+      });
     });
 
     it('存在しない問い合わせのステータス更新は404になる', async () => {
-      /**
-       * transaction内で問い合わせが
-       * 見つからない状態を再現する。
-       */
       inquiryRepository.findOne.mockResolvedValue(null);
 
       await expect(
         service.updateStatus(
           'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          updateStatusDto,
+          { status: InquiryStatus.ANSWERED },
           adminUser,
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
 
-      /**
-       * 問い合わせが存在しないため、
-       * ステータス変更履歴は生成されない。
-       */
       expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
-
       expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
-
-      /**
-       * Inquiry自体も更新されない。
-       */
       expect(inquiryRepository.save).not.toHaveBeenCalled();
     });
 
     it('ステータス更新成功時にSTATUS_CHANGE本文へ変更前後のステータスが記録される', async () => {
-      const inquiryBeforeUpdate: Inquiry = {
-        ...ownInquiry,
-        status: InquiryStatus.OPEN,
-      };
-
-      inquiryRepository.findOne.mockResolvedValue(inquiryBeforeUpdate);
-
-      inquiryRepository.save.mockImplementation(
-        async (inquiry: Inquiry) => inquiry,
+      const { inquiryBeforeUpdate } = setupUpdateStatusSuccess(
+        InquiryStatus.ANSWERED,
+        InquiryStatus.CLOSED,
       );
-
-      const statusMessage: InquiryMessage = {
-        messageId: '44444444-4444-4444-8444-444444444444',
-
-        inquiryId: inquiryBeforeUpdate.inquiryId,
-
-        senderUserId: null,
-
-        type: InquiryMessageType.STATUS_CHANGE,
-
-        body: 'Status changed from OPEN to ANSWERED',
-
-        createdAt: new Date(),
-
-        inquiry: undefined as never,
-
-        senderUser: null,
-      };
-
-      inquiryMessageRepository.create.mockReturnValue(statusMessage);
-
-      inquiryMessageRepository.save.mockResolvedValue(statusMessage);
-
-      mockFindOneQueryBuilder({
-        ...inquiryBeforeUpdate,
-        status: InquiryStatus.ANSWERED,
-      });
 
       await service.updateStatus(
         inquiryBeforeUpdate.inquiryId,
-        updateStatusDto,
-        adminUser,
+        { status: InquiryStatus.CLOSED },
+        careManagerUser,
       );
 
       expect(inquiryMessageRepository.create).toHaveBeenCalledWith({
         inquiryId: inquiryBeforeUpdate.inquiryId,
-
         senderUserId: null,
-
         type: InquiryMessageType.STATUS_CHANGE,
-
-        body: 'Status changed from OPEN to ANSWERED',
+        body: 'Status changed from ANSWERED to CLOSED',
       });
     });
 
     it('ステータス更新成功時にlastMessageAtがSTATUS_CHANGEメッセージ日時へ更新される', async () => {
-      const { inquiryBeforeUpdate, statusMessage } = setupUpdateStatusSuccess();
+      const { inquiryBeforeUpdate, statusMessage } = setupUpdateStatusSuccess(
+        InquiryStatus.ANSWERED,
+        InquiryStatus.CLOSED,
+      );
 
       await service.updateStatus(
         inquiryBeforeUpdate.inquiryId,
-        updateStatusDto,
-        adminUser,
+        { status: InquiryStatus.CLOSED },
+        careManagerUser,
       );
 
       expect(inquiryBeforeUpdate.lastMessageAt).toEqual(
         statusMessage.createdAt,
       );
-
       expect(inquiryRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
           inquiryId: inquiryBeforeUpdate.inquiryId,
-
           lastMessageAt: statusMessage.createdAt,
         }),
       );
     });
 
     it('同じステータスへの更新ではSTATUS_CHANGEを作成しない', async () => {
-      /**
-       * 現在のステータスと更新後ステータスを
-       * どちらもANSWEREDにする。
-       */
       const sameStatusInquiry: Inquiry = {
         ...ownInquiry,
         status: InquiryStatus.ANSWERED,
       };
 
       inquiryRepository.findOne.mockResolvedValue(sameStatusInquiry);
-
-      /**
-       * transaction終了後に
-       * updateStatus()からfindOne()が呼ばれるため、
-       * 詳細取得用QueryBuilderを準備する。
-       */
       mockFindOneQueryBuilder(sameStatusInquiry);
 
       const result = await service.updateStatus(
         sameStatusInquiry.inquiryId,
-        {
-          status: InquiryStatus.ANSWERED,
-        },
-        adminUser,
+        { status: InquiryStatus.ANSWERED },
+        careManagerUser,
       );
 
-      /**
-       * ステータスはそのままANSWERED。
-       */
       expect(result.status).toBe(InquiryStatus.ANSWERED);
-
-      /**
-       * 同一ステータスなので
-       * Inquiry自体を保存しない。
-       */
       expect(inquiryRepository.save).not.toHaveBeenCalled();
-
-      /**
-       * STATUS_CHANGEメッセージも
-       * 作成・保存しない。
-       */
       expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
-
       expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
     });
   });

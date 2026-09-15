@@ -414,6 +414,11 @@ export class InquiriesService {
       await this.assertInquiryAccess(inquiry, user, manager);
 
       /**
+       * ロールごとに許可されたステータス遷移か確認する。
+       */
+      this.assertStatusTransition(inquiry.status, dto.status, user.role);
+
+      /**
        * 迴ｾ蝨ｨ縺ｨ蜷後§繧ｹ繝・・繧ｿ繧ｹ縺梧欠螳壹＆繧後◆蝣ｴ蜷医・縲・
        * Inquiry譖ｴ譁ｰ繝ｻSTATUS_CHANGE螻･豁ｴ菴懈・繧定｡後ｏ縺ｪ縺・・
        */
@@ -460,6 +465,88 @@ export class InquiriesService {
      * 譛譁ｰ迥ｶ諷九ｒ隧ｳ邏ｰ繝ｬ繧ｹ繝昴Φ繧ｹ縺ｨ縺励※霑斐☆縲・
      */
     return this.findOne(inquiryId, user);
+  }
+
+  /**
+   * 問い合わせステータスの遷移が、
+   * ユーザーのロールに対して許可されているか確認する。
+   */
+  private assertStatusTransition(
+    currentStatus: InquiryStatus,
+    nextStatus: InquiryStatus,
+    role: UserRole,
+  ): void {
+    /**
+     * 同一ステータスへの更新は許可する。
+     *
+     * updateStatus() 側で変更なしとして処理される。
+     */
+    if (currentStatus === nextStatus) {
+      return;
+    }
+
+    /**
+     * ADMINは管理用途としてすべての遷移を許可する。
+     */
+    if (role === UserRole.ADMIN) {
+      return;
+    }
+
+    /**
+     * 施設職員が行える遷移。
+     *
+     * OPEN
+     *   ↓
+     * IN_PROGRESS
+     *   ↓
+     * ANSWERED
+     */
+    if (role === UserRole.FACILITY) {
+      const allowed =
+        (currentStatus === InquiryStatus.OPEN &&
+          nextStatus === InquiryStatus.IN_PROGRESS) ||
+        (currentStatus === InquiryStatus.IN_PROGRESS &&
+          nextStatus === InquiryStatus.ANSWERED);
+
+      if (allowed) {
+        return;
+      }
+
+      throw new ForbiddenException(
+        'This status transition is not allowed for facility users',
+      );
+    }
+
+    /**
+     * ケアマネが行える遷移。
+     *
+     * ANSWERED → CLOSED
+     *
+     * また、完了・キャンセル済みでなければ
+     * 問い合わせをCANCELLEDにできる。
+     */
+    if (role === UserRole.CARE_MANAGER) {
+      const canClose =
+        currentStatus === InquiryStatus.ANSWERED &&
+        nextStatus === InquiryStatus.CLOSED;
+
+      const canCancel =
+        currentStatus !== InquiryStatus.CLOSED &&
+        currentStatus !== InquiryStatus.CANCELLED &&
+        nextStatus === InquiryStatus.CANCELLED;
+
+      if (canClose || canCancel) {
+        return;
+      }
+
+      throw new ForbiddenException(
+        'This status transition is not allowed for care manager users',
+      );
+    }
+
+    throw new ForbiddenException(
+      'You are not allowed to update inquiry status',
+    );
   }
 
   /**
