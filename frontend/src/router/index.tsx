@@ -10,6 +10,7 @@ import { FacilitySearchPage } from "../features/facilities/pages/FacilitySearchP
 import { InquiryCreatePage } from "../features/inquiries/pages/InquiryCreatePage";
 import { InquiryDetailPage } from "../features/inquiries/pages/InquiryDetailPage";
 import { InquiryListPage } from "../features/inquiries/pages/InquiryListPage";
+import { PlacementCaseCreatePage } from "../features/placement-cases/pages/PlacementCaseCreatePage";
 import { PlacementCaseListPage } from "../features/placement-cases/pages/PlacementCaseListPage";
 import { PlacementCaseDetailPage } from "../features/placement-cases/pages/PlacementCaseDetailPage";
 
@@ -114,6 +115,15 @@ export const router = createBrowserRouter([
   /**
    * 施設探し案件詳細。
    */
+  {
+    path: "/placement-cases/new",
+    element: (
+      <RequireAuth>
+        <PlacementCaseCreatePage />
+      </RequireAuth>
+    ),
+  },
+
   {
     path: "/placement-cases/:placementCaseId",
     element: (
