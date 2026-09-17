@@ -794,7 +794,30 @@ export function PlacementCaseDetailPage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">医療条件</Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6">医療条件</Typography>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    navigate(
+                      `/placement-cases/${placementCaseId}/medical-requirements`,
+                    );
+                  }}
+                >
+                  {medicalRequirements.length === 0
+                    ? "医療条件を登録"
+                    : "医療条件を編集"}
+                </Button>
+              </Box>
 
               <Divider />
 
