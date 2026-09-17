@@ -1,4 +1,4 @@
-﻿import {
+import {
   Alert,
   Box,
   Button,
@@ -695,7 +695,28 @@ export function PlacementCaseDetailPage() {
         <Card>
           <CardContent>
             <Stack spacing={2}>
-              <Typography variant="h6">利用者条件</Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 2,
+                }}
+              >
+                <Typography variant="h6">利用者条件</Typography>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    navigate(
+                      `/placement-cases/${placementCaseId}/conditions`,
+                    );
+                  }}
+                >
+                  {clientCondition ? "利用者条件を編集" : "利用者条件を登録"}
+                </Button>
+              </Box>
 
               <Divider />
 

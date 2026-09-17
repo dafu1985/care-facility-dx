@@ -10,9 +10,11 @@ import { FacilitySearchPage } from "../features/facilities/pages/FacilitySearchP
 import { InquiryCreatePage } from "../features/inquiries/pages/InquiryCreatePage";
 import { InquiryDetailPage } from "../features/inquiries/pages/InquiryDetailPage";
 import { InquiryListPage } from "../features/inquiries/pages/InquiryListPage";
+
+import { ClientConditionEditPage } from "../features/placement-cases/pages/ClientConditionEditPage";
 import { PlacementCaseCreatePage } from "../features/placement-cases/pages/PlacementCaseCreatePage";
-import { PlacementCaseListPage } from "../features/placement-cases/pages/PlacementCaseListPage";
 import { PlacementCaseDetailPage } from "../features/placement-cases/pages/PlacementCaseDetailPage";
+import { PlacementCaseListPage } from "../features/placement-cases/pages/PlacementCaseListPage";
 
 /**
  * アプリケーション全体のルーティング設定。
@@ -113,7 +115,10 @@ export const router = createBrowserRouter([
   },
 
   /**
-   * 施設探し案件詳細。
+   * 施設探し案件新規作成。
+   *
+   * :placementCaseId より前に定義し、
+   * "new" が案件IDとして解釈されないようにする。
    */
   {
     path: "/placement-cases/new",
@@ -124,6 +129,21 @@ export const router = createBrowserRouter([
     ),
   },
 
+  /**
+   * 利用者条件の登録・編集。
+   */
+  {
+    path: "/placement-cases/:placementCaseId/conditions",
+    element: (
+      <RequireAuth>
+        <ClientConditionEditPage />
+      </RequireAuth>
+    ),
+  },
+
+  /**
+   * 施設探し案件詳細。
+   */
   {
     path: "/placement-cases/:placementCaseId",
     element: (
