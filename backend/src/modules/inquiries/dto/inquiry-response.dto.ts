@@ -267,3 +267,44 @@ export class InquiryListResponseDto {
   })
   total: number;
 }
+
+export class InquiryUnreadItemResponseDto {
+  @ApiProperty({
+    description: '未読メッセージが存在する問い合わせID',
+    example: '808239cf-f7e4-454d-937d-dff4daa00c74',
+  })
+  inquiryId: string;
+
+  @ApiProperty({
+    description: 'この問い合わせの未読メッセージ件数',
+    example: 2,
+  })
+  unreadCount: number;
+
+  @ApiProperty({
+    description: '最新の未読メッセージ日時',
+    example: '2026-09-18T01:30:00.000Z',
+  })
+  latestUnreadMessageAt: Date;
+}
+
+export class InquiryUnreadSummaryResponseDto {
+  @ApiProperty({
+    description: '全問い合わせを合計した未読メッセージ件数',
+    example: 3,
+  })
+  totalUnreadCount: number;
+
+  @ApiProperty({
+    description: '未読メッセージが存在する問い合わせ数',
+    example: 2,
+  })
+  unreadInquiryCount: number;
+
+  @ApiProperty({
+    description: '問い合わせごとの未読情報',
+    type: () => InquiryUnreadItemResponseDto,
+    isArray: true,
+  })
+  inquiries: InquiryUnreadItemResponseDto[];
+}

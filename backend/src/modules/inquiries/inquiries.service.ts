@@ -25,18 +25,21 @@ import {
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { CreateInquiryMessageDto } from './dto/create-inquiry-message.dto';
 import { InquirySearchDto } from './dto/inquiry-search.dto';
+import { MarkInquiryReadDto } from './dto/mark-inquiry-read.dto';
 import { UpdateInquiryStatusDto } from './dto/update-inquiry-status.dto';
 import {
   CreateInquiryResponseDto,
   InquiryListResponseDto,
   InquiryMessageResponseDto,
   InquiryResponseDto,
+  InquiryUnreadSummaryResponseDto,
 } from './dto/inquiry-response.dto';
 import { Inquiry, InquiryStatus } from './entities/inquiry.entity';
 import {
   InquiryMessage,
   InquiryMessageType,
 } from './entities/inquiry-message.entity';
+import { InquiryReadStatus } from './entities/inquiry-read-status.entity';
 import { InquiryMapper } from './inquiry.mapper';
 
 @Injectable()
@@ -554,8 +557,170 @@ export class InquiriesService {
   }
 
   /**
-   * 繝ｦ繝ｼ繧ｶ繝ｼ縺窟CTIVE迥ｶ諷九〒謇螻槭＠縺ｦ縺・ｋ譁ｽ險ｭID荳隕ｧ繧貞叙蠕励☆繧九・
+   * ログインユーザーの未読メッセージ情報を取得する。
+   *
+   * 未読対象:
+   * - MESSAGEのみ
+   * - 自分以外が送信したメッセージのみ
+   * - 未読状態が存在しない、またはlastReadAtより新しいメッセージ
    */
+  async getUnreadSummary(
+    user: AuthenticatedUser,
+  ): Promise<InquiryUnreadSummaryResponseDto> {
+    const messageRepository = this.dataSource.getRepository(InquiryMessage);
+
+    const queryBuilder = messageRepository
+      .createQueryBuilder('message')
+      .innerJoin('message.inquiry', 'inquiry')
+      .leftJoin(
+        'inquiry_read_status',
+        'read_status',
+        'read_status.inquiry_id = inquiry.inquiryId AND read_status.user_id = :userId',
+        {
+          userId: user.userId,
+        },
+      )
+      .select('inquiry.inquiryId', 'inquiryId')
+      .addSelect('COUNT(message.messageId)', 'unreadCount')
+      .addSelect('MAX(message.createdAt)', 'latestUnreadMessageAt')
+      .where('message.type = :messageType', {
+        messageType: InquiryMessageType.MESSAGE,
+      })
+      .andWhere('message.senderUserId IS NOT NULL')
+      .andWhere('message.senderUserId != :userId', {
+        userId: user.userId,
+      })
+      .andWhere(
+        '(read_status.inquiry_read_status_id IS NULL OR message.createdAt > read_status.last_read_at)',
+      );
+
+    // ケアマネは自分が作成した問い合わせのみ
+    if (user.role === UserRole.CARE_MANAGER) {
+      queryBuilder.andWhere('inquiry.createdByUserId = :createdByUserId', {
+        createdByUserId: user.userId,
+      });
+    }
+
+    // 施設職員はACTIVEで所属している施設宛のみ
+    else if (user.role === UserRole.FACILITY) {
+      const facilityIds = await this.getActiveFacilityIds(
+        user.userId,
+        this.dataSource.manager,
+      );
+
+      if (facilityIds.length === 0) {
+        throw new ForbiddenException('No active facility assignment found');
+      }
+
+      queryBuilder.andWhere('inquiry.facilityId IN (:...facilityIds)', {
+        facilityIds,
+      });
+    }
+
+    // ADMINは全問い合わせを対象とする
+    else if (user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('You are not allowed to access inquiries');
+    }
+
+    const rows = await queryBuilder
+      .groupBy('inquiry.inquiryId')
+      .orderBy('MAX(message.createdAt)', 'DESC')
+      .getRawMany<{
+        inquiryId: string;
+        unreadCount: string;
+        latestUnreadMessageAt: Date | string;
+      }>();
+
+    const inquiries = rows.map((row) => ({
+      inquiryId: row.inquiryId,
+      unreadCount: Number(row.unreadCount),
+      latestUnreadMessageAt: new Date(row.latestUnreadMessageAt),
+    }));
+
+    return {
+      totalUnreadCount: inquiries.reduce(
+        (total, inquiry) => total + inquiry.unreadCount,
+        0,
+      ),
+      unreadInquiryCount: inquiries.length,
+      inquiries,
+    };
+  }
+
+  /**
+   * 問い合わせを指定メッセージまで既読にする。
+   *
+   * クライアントが実際に表示した最後のメッセージの
+   * createdAt を既読位置として保存する。
+   */
+  async markAsRead(
+    inquiryId: string,
+    dto: MarkInquiryReadDto,
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const inquiryRepository = manager.getRepository(Inquiry);
+      const messageRepository = manager.getRepository(InquiryMessage);
+      const readStatusRepository = manager.getRepository(InquiryReadStatus);
+
+      // 問い合わせの存在確認
+      const inquiry = await inquiryRepository.findOne({
+        where: {
+          inquiryId,
+        },
+      });
+
+      if (!inquiry) {
+        throw new NotFoundException('Inquiry not found');
+      }
+
+      // 既存の問い合わせ認可をそのまま利用する
+      await this.assertInquiryAccess(inquiry, user, manager);
+
+      // 画面上で確認した最後のメッセージを取得する
+      const message = await messageRepository.findOne({
+        where: {
+          messageId: dto.messageId,
+          inquiryId,
+        },
+      });
+
+      if (!message) {
+        throw new NotFoundException('Inquiry message not found');
+      }
+
+      // Inquiry × User 単位の既読状態を取得する
+      const existingReadStatus = await readStatusRepository.findOne({
+        where: {
+          inquiryId,
+          userId: user.userId,
+        },
+      });
+
+      if (existingReadStatus) {
+        /**
+         * 古い画面や遅延したリクエストによって
+         * 既読位置が過去へ戻ることを防ぐ。
+         */
+        if (message.createdAt > existingReadStatus.lastReadAt) {
+          existingReadStatus.lastReadAt = message.createdAt;
+          await readStatusRepository.save(existingReadStatus);
+        }
+
+        return;
+      }
+
+      // 初回既読
+      const readStatus = readStatusRepository.create({
+        inquiryId,
+        userId: user.userId,
+        lastReadAt: message.createdAt,
+      });
+
+      await readStatusRepository.save(readStatus);
+    });
+  }
+
   private async getActiveFacilityIds(
     userId: string,
     manager: EntityManager,

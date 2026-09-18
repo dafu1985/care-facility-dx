@@ -29,6 +29,7 @@ import {
   InquiryMessage,
   InquiryMessageType,
 } from './entities/inquiry-message.entity';
+import { InquiryReadStatus } from './entities/inquiry-read-status.entity';
 
 /**
  * QueryBuilderの必要部分だけを持つテスト用型。
@@ -96,9 +97,27 @@ describe('InquiriesService authorization', () => {
    * InquiryMessage Repository モック。
    */
   const inquiryMessageRepository = {
+    createQueryBuilder: jest.fn(),
+
     create: jest.fn<(message: Partial<InquiryMessage>) => InquiryMessage>(),
 
+    findOne: jest.fn<() => Promise<InquiryMessage | null>>(),
+
     save: jest.fn<(message: InquiryMessage) => Promise<InquiryMessage>>(),
+  };
+
+  /**
+   * InquiryReadStatus Repository モック。
+   */
+  const inquiryReadStatusRepository = {
+    findOne: jest.fn<() => Promise<InquiryReadStatus | null>>(),
+
+    create:
+      jest.fn<(readStatus: Partial<InquiryReadStatus>) => InquiryReadStatus>(),
+
+    save: jest.fn<
+      (readStatus: InquiryReadStatus) => Promise<InquiryReadStatus>
+    >(),
   };
 
   /**
@@ -230,6 +249,10 @@ describe('InquiriesService authorization', () => {
         return inquiryRepository;
       }
 
+      if (entity === InquiryMessage) {
+        return inquiryMessageRepository;
+      }
+
       if (entity === FacilityStaff) {
         return facilityStaffRepository;
       }
@@ -249,6 +272,10 @@ describe('InquiriesService authorization', () => {
 
       if (entity === InquiryMessage) {
         return inquiryMessageRepository;
+      }
+
+      if (entity === InquiryReadStatus) {
+        return inquiryReadStatusRepository;
       }
 
       if (entity === FacilityStaff) {
@@ -329,6 +356,186 @@ describe('InquiriesService authorization', () => {
 
     return queryBuilder;
   };
+
+  /**
+   * getUnreadSummary() 用QueryBuilderを生成する。
+   */
+  const mockUnreadSummaryQueryBuilder = (
+    rows: Array<{
+      inquiryId: string;
+      unreadCount: string;
+      latestUnreadMessageAt: Date | string;
+    }>,
+  ): MockUnreadSummaryQueryBuilder => {
+    const queryBuilder = {
+      innerJoin: jest.fn().mockReturnThis(),
+
+      leftJoin: jest.fn().mockReturnThis(),
+
+      select: jest.fn().mockReturnThis(),
+
+      addSelect: jest.fn().mockReturnThis(),
+
+      where: jest.fn().mockReturnThis(),
+
+      andWhere: jest.fn().mockReturnThis(),
+
+      groupBy: jest.fn().mockReturnThis(),
+
+      orderBy: jest.fn().mockReturnThis(),
+
+      getRawMany: jest.fn().mockResolvedValue(rows),
+    };
+
+    inquiryMessageRepository.createQueryBuilder.mockReturnValue(queryBuilder);
+
+    return queryBuilder;
+  };
+
+  /**
+   * getUnreadSummary() 用QueryBuilderのテスト用型。
+   */
+  type MockUnreadSummaryQueryBuilder = {
+    innerJoin: ReturnType<typeof jest.fn>;
+    leftJoin: ReturnType<typeof jest.fn>;
+    select: ReturnType<typeof jest.fn>;
+    addSelect: ReturnType<typeof jest.fn>;
+    where: ReturnType<typeof jest.fn>;
+    andWhere: ReturnType<typeof jest.fn>;
+    groupBy: ReturnType<typeof jest.fn>;
+    orderBy: ReturnType<typeof jest.fn>;
+    getRawMany: ReturnType<typeof jest.fn>;
+  };
+
+  describe('getUnreadSummary', () => {
+    it('CARE_MANAGERは自分宛の未読MESSAGEを問い合わせごとに集計できる', async () => {
+      const queryBuilder = mockUnreadSummaryQueryBuilder([
+        {
+          inquiryId: '11111111-1111-4111-8111-111111111111',
+          unreadCount: '2',
+          latestUnreadMessageAt: '2026-09-18T01:30:00.000Z',
+        },
+        {
+          inquiryId: '22222222-2222-4222-8222-222222222222',
+          unreadCount: '1',
+          latestUnreadMessageAt: '2026-09-18T01:00:00.000Z',
+        },
+      ]);
+
+      const result = await service.getUnreadSummary(careManagerUser);
+
+      // MESSAGEのみを未読対象とする
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        'message.type = :messageType',
+        {
+          messageType: InquiryMessageType.MESSAGE,
+        },
+      );
+
+      // SYSTEM / STATUS_CHANGEなどsenderUserIdがないものを除外する
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'message.senderUserId IS NOT NULL',
+      );
+
+      // 自分自身が送信したMESSAGEを除外する
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'message.senderUserId != :userId',
+        {
+          userId: careManagerUser.userId,
+        },
+      );
+
+      // 既読位置より新しいMESSAGEのみを対象とする
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        '(read_status.inquiry_read_status_id IS NULL OR message.createdAt > read_status.last_read_at)',
+      );
+
+      // CARE_MANAGERは自分が作成した問い合わせだけを対象とする
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        'inquiry.createdByUserId = :createdByUserId',
+        {
+          createdByUserId: careManagerUser.userId,
+        },
+      );
+
+      expect(result.totalUnreadCount).toBe(3);
+      expect(result.unreadInquiryCount).toBe(2);
+
+      expect(result.inquiries).toEqual([
+        {
+          inquiryId: '11111111-1111-4111-8111-111111111111',
+          unreadCount: 2,
+          latestUnreadMessageAt: new Date('2026-09-18T01:30:00.000Z'),
+        },
+        {
+          inquiryId: '22222222-2222-4222-8222-222222222222',
+          unreadCount: 1,
+          latestUnreadMessageAt: new Date('2026-09-18T01:00:00.000Z'),
+        },
+      ]);
+    });
+  });
+
+  it('FACILITYはACTIVE所属施設宛の未読MESSAGEだけを対象にする', async () => {
+    facilityStaffRepository.find.mockResolvedValue([
+      {
+        facilityStaffId: '11111111-1111-4111-8111-111111111111',
+        userId: facilityUser.userId,
+        facilityId: ownInquiry.facilityId,
+        role: FacilityStaffRole.MANAGER,
+        status: FacilityStaffStatus.ACTIVE,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: undefined as never,
+        facility: undefined as never,
+      },
+    ]);
+
+    const queryBuilder = mockUnreadSummaryQueryBuilder([
+      {
+        inquiryId: ownInquiry.inquiryId,
+        unreadCount: '2',
+        latestUnreadMessageAt: '2026-09-18T02:00:00.000Z',
+      },
+    ]);
+
+    const result = await service.getUnreadSummary(facilityUser);
+
+    // ACTIVEで所属している施設を取得する
+    expect(facilityStaffRepository.find).toHaveBeenCalledWith({
+      where: {
+        userId: facilityUser.userId,
+        status: FacilityStaffStatus.ACTIVE,
+      },
+    });
+
+    // 所属施設宛の問い合わせだけを未読対象とする
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      'inquiry.facilityId IN (:...facilityIds)',
+      {
+        facilityIds: [ownInquiry.facilityId],
+      },
+    );
+
+    // FACILITY自身が送信したMESSAGEは未読に含めない
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+      'message.senderUserId != :userId',
+      {
+        userId: facilityUser.userId,
+      },
+    );
+
+    expect(result.totalUnreadCount).toBe(2);
+    expect(result.unreadInquiryCount).toBe(1);
+
+    expect(result.inquiries).toEqual([
+      {
+        inquiryId: ownInquiry.inquiryId,
+        unreadCount: 2,
+        latestUnreadMessageAt: new Date('2026-09-18T02:00:00.000Z'),
+      },
+    ]);
+  });
 
   describe('create duplicate inquiry', () => {
     const placementCaseId = '4d3b87cb-5096-4b26-be90-0ff915b1d6d2';
@@ -1173,6 +1380,131 @@ describe('InquiriesService authorization', () => {
       expect(inquiryRepository.save).not.toHaveBeenCalled();
       expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
       expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('markAsRead', () => {
+    const displayedMessage: InquiryMessage = {
+      messageId: '77777777-7777-4777-8777-777777777777',
+      inquiryId: ownInquiry.inquiryId,
+      senderUserId: facilityUser.userId,
+      type: InquiryMessageType.MESSAGE,
+      body: '既読位置のテストメッセージです。',
+      createdAt: new Date('2026-09-18T01:30:00.000Z'),
+      inquiry: undefined as never,
+      senderUser: undefined as never,
+    };
+
+    it('既読情報がない場合は指定メッセージの日時で新規作成する', async () => {
+      inquiryRepository.findOne.mockResolvedValue(ownInquiry);
+      inquiryMessageRepository.findOne.mockResolvedValue(displayedMessage);
+      inquiryReadStatusRepository.findOne.mockResolvedValue(null);
+
+      const createdReadStatus: InquiryReadStatus = {
+        inquiryReadStatusId: '88888888-8888-4888-8888-888888888888',
+        inquiryId: ownInquiry.inquiryId,
+        userId: careManagerUser.userId,
+        lastReadAt: displayedMessage.createdAt,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        inquiry: undefined as never,
+        user: undefined as never,
+      };
+
+      inquiryReadStatusRepository.create.mockReturnValue(createdReadStatus);
+      inquiryReadStatusRepository.save.mockResolvedValue(createdReadStatus);
+
+      await service.markAsRead(
+        ownInquiry.inquiryId,
+        { messageId: displayedMessage.messageId },
+        careManagerUser,
+      );
+
+      expect(inquiryReadStatusRepository.create).toHaveBeenCalledWith({
+        inquiryId: ownInquiry.inquiryId,
+        userId: careManagerUser.userId,
+        lastReadAt: displayedMessage.createdAt,
+      });
+      expect(inquiryReadStatusRepository.save).toHaveBeenCalledWith(
+        createdReadStatus,
+      );
+    });
+
+    it('既読位置より新しいメッセージを確認した場合はlastReadAtを進める', async () => {
+      inquiryRepository.findOne.mockResolvedValue(ownInquiry);
+      inquiryMessageRepository.findOne.mockResolvedValue(displayedMessage);
+
+      const existingReadStatus: InquiryReadStatus = {
+        inquiryReadStatusId: '88888888-8888-4888-8888-888888888888',
+        inquiryId: ownInquiry.inquiryId,
+        userId: careManagerUser.userId,
+        lastReadAt: new Date('2026-09-18T01:00:00.000Z'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        inquiry: undefined as never,
+        user: undefined as never,
+      };
+
+      inquiryReadStatusRepository.findOne.mockResolvedValue(existingReadStatus);
+      inquiryReadStatusRepository.save.mockImplementation(
+        async (readStatus: InquiryReadStatus) => readStatus,
+      );
+
+      await service.markAsRead(
+        ownInquiry.inquiryId,
+        { messageId: displayedMessage.messageId },
+        careManagerUser,
+      );
+
+      expect(existingReadStatus.lastReadAt).toEqual(displayedMessage.createdAt);
+      expect(inquiryReadStatusRepository.save).toHaveBeenCalledWith(
+        existingReadStatus,
+      );
+    });
+
+    it('既読位置より古いメッセージを指定してもlastReadAtを後退させない', async () => {
+      inquiryRepository.findOne.mockResolvedValue(ownInquiry);
+      inquiryMessageRepository.findOne.mockResolvedValue(displayedMessage);
+
+      const currentLastReadAt = new Date('2026-09-18T02:00:00.000Z');
+      const existingReadStatus: InquiryReadStatus = {
+        inquiryReadStatusId: '88888888-8888-4888-8888-888888888888',
+        inquiryId: ownInquiry.inquiryId,
+        userId: careManagerUser.userId,
+        lastReadAt: currentLastReadAt,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        inquiry: undefined as never,
+        user: undefined as never,
+      };
+
+      inquiryReadStatusRepository.findOne.mockResolvedValue(existingReadStatus);
+
+      await service.markAsRead(
+        ownInquiry.inquiryId,
+        { messageId: displayedMessage.messageId },
+        careManagerUser,
+      );
+
+      expect(existingReadStatus.lastReadAt).toEqual(currentLastReadAt);
+      expect(inquiryReadStatusRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('指定メッセージが問い合わせ内に存在しない場合は404になる', async () => {
+      inquiryRepository.findOne.mockResolvedValue(ownInquiry);
+      inquiryMessageRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.markAsRead(
+          ownInquiry.inquiryId,
+          { messageId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+          careManagerUser,
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(inquiryReadStatusRepository.findOne).not.toHaveBeenCalled();
+      expect(inquiryReadStatusRepository.create).not.toHaveBeenCalled();
+      expect(inquiryReadStatusRepository.save).not.toHaveBeenCalled();
     });
   });
 });

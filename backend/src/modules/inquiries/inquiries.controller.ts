@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -31,32 +32,26 @@ import { UserRole } from '../users/entities/user.entity';
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
 import { CreateInquiryMessageDto } from './dto/create-inquiry-message.dto';
 import { InquirySearchDto } from './dto/inquiry-search.dto';
+import { MarkInquiryReadDto } from './dto/mark-inquiry-read.dto';
 import { UpdateInquiryStatusDto } from './dto/update-inquiry-status.dto';
 import {
   CreateInquiryResponseDto,
   InquiryListResponseDto,
   InquiryMessageResponseDto,
   InquiryResponseDto,
+  InquiryUnreadSummaryResponseDto,
 } from './dto/inquiry-response.dto';
 import { InquiriesService } from './inquiries.service';
 
 @ApiTags('inquiries')
 @ApiBearerAuth()
-@UseGuards(
-  JwtAuthGuard,
-  RolesGuard,
-)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('inquiries')
 export class InquiriesController {
-  constructor(
-    private readonly inquiriesService: InquiriesService,
-  ) {}
+  constructor(private readonly inquiriesService: InquiriesService) {}
 
   @Post()
-  @Roles(
-    UserRole.CARE_MANAGER,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.CARE_MANAGER, UserRole.ADMIN)
   @ApiOperation({
     summary: '問い合わせを作成する',
     description:
@@ -77,18 +72,11 @@ export class InquiriesController {
     @CurrentUser()
     user: AuthenticatedUser,
   ): Promise<CreateInquiryResponseDto> {
-    return this.inquiriesService.create(
-      dto,
-      user,
-    );
+    return this.inquiriesService.create(dto, user);
   }
 
   @Get()
-  @Roles(
-    UserRole.CARE_MANAGER,
-    UserRole.FACILITY,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
   @ApiOperation({
     summary: '問い合わせ一覧を取得する',
     description:
@@ -109,18 +97,32 @@ export class InquiriesController {
     @CurrentUser()
     user: AuthenticatedUser,
   ): Promise<InquiryListResponseDto> {
-    return this.inquiriesService.findAll(
-      query,
-      user,
-    );
+    return this.inquiriesService.findAll(query, user);
+  }
+
+  @Get('unread-summary')
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
+  @ApiOperation({
+    summary: '未読メッセージ情報を取得する',
+    description:
+      'ログインユーザーがまだ確認していない、他ユーザーから受信したMESSAGEの件数を問い合わせごとに取得します。',
+  })
+  @ApiOkResponse({
+    description: '未読メッセージ情報の取得に成功',
+    type: InquiryUnreadSummaryResponseDto,
+  })
+  @ApiForbiddenResponse({
+    description: '問い合わせへのアクセス権がない',
+  })
+  async getUnreadSummary(
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ): Promise<InquiryUnreadSummaryResponseDto> {
+    return this.inquiriesService.getUnreadSummary(user);
   }
 
   @Get(':inquiryId')
-  @Roles(
-    UserRole.CARE_MANAGER,
-    UserRole.FACILITY,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
   @ApiOperation({
     summary: '問い合わせ詳細を取得する',
     description:
@@ -145,26 +147,50 @@ export class InquiriesController {
     description: '指定された問い合わせが存在しない',
   })
   async findOne(
-    @Param(
-      'inquiryId',
-      new ParseUUIDPipe(),
-    )
+    @Param('inquiryId', new ParseUUIDPipe())
     inquiryId: string,
     @CurrentUser()
     user: AuthenticatedUser,
   ): Promise<InquiryResponseDto> {
-    return this.inquiriesService.findOne(
-      inquiryId,
-      user,
-    );
+    return this.inquiriesService.findOne(inquiryId, user);
+  }
+
+  @Put(':inquiryId/read')
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
+  @ApiOperation({
+    summary: '問い合わせを指定メッセージまで既読にする',
+    description:
+      '画面上で確認した最後のメッセージを基準に、ユーザーごとの既読位置を更新します。',
+  })
+  @ApiParam({
+    name: 'inquiryId',
+    description: '問い合わせID',
+    example: '808239cf-f7e4-454d-937d-dff4daa00c74',
+  })
+  @ApiOkResponse({
+    description: '既読位置の更新に成功',
+  })
+  @ApiBadRequestResponse({
+    description: '問い合わせIDまたはメッセージIDの形式が不正',
+  })
+  @ApiForbiddenResponse({
+    description: 'この問い合わせへのアクセス権がない',
+  })
+  @ApiNotFoundResponse({
+    description: '問い合わせまたはメッセージが存在しない',
+  })
+  async markAsRead(
+    @Param('inquiryId', new ParseUUIDPipe())
+    inquiryId: string,
+    @Body() dto: MarkInquiryReadDto,
+    @CurrentUser()
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    await this.inquiriesService.markAsRead(inquiryId, dto, user);
   }
 
   @Post(':inquiryId/messages')
-  @Roles(
-    UserRole.CARE_MANAGER,
-    UserRole.FACILITY,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
   @ApiOperation({
     summary: '問い合わせにメッセージを追加する',
     description:
@@ -189,28 +215,17 @@ export class InquiriesController {
     description: '指定された問い合わせが存在しない',
   })
   async addMessage(
-    @Param(
-      'inquiryId',
-      new ParseUUIDPipe(),
-    )
+    @Param('inquiryId', new ParseUUIDPipe())
     inquiryId: string,
     @Body() dto: CreateInquiryMessageDto,
     @CurrentUser()
     user: AuthenticatedUser,
   ): Promise<InquiryMessageResponseDto> {
-    return this.inquiriesService.addMessage(
-      inquiryId,
-      dto,
-      user,
-    );
+    return this.inquiriesService.addMessage(inquiryId, dto, user);
   }
 
   @Patch(':inquiryId/status')
-  @Roles(
-    UserRole.CARE_MANAGER,
-    UserRole.FACILITY,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.CARE_MANAGER, UserRole.FACILITY, UserRole.ADMIN)
   @ApiOperation({
     summary: '問い合わせステータスを更新する',
     description:
@@ -235,19 +250,12 @@ export class InquiriesController {
     description: '指定された問い合わせが存在しない',
   })
   async updateStatus(
-    @Param(
-      'inquiryId',
-      new ParseUUIDPipe(),
-    )
+    @Param('inquiryId', new ParseUUIDPipe())
     inquiryId: string,
     @Body() dto: UpdateInquiryStatusDto,
     @CurrentUser()
     user: AuthenticatedUser,
   ): Promise<InquiryResponseDto> {
-    return this.inquiriesService.updateStatus(
-      inquiryId,
-      dto,
-      user,
-    );
+    return this.inquiriesService.updateStatus(inquiryId, dto, user);
   }
 }
