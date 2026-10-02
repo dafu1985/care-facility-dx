@@ -14,8 +14,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { removeAccessToken } from "../../auth/utils/token-storage";
-
 import { getCareManagerDashboard } from "../api/get-care-manager-dashboard";
 
 import type { CareManagerDashboardResponse } from "../types/care-manager-dashboard";
@@ -137,20 +135,6 @@ export function CareManagerDashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * ログアウト処理。
-   *
-   * 保存されているJWTを削除して、
-   * ログイン画面へ遷移する。
-   */
-  const handleLogout = () => {
-    removeAccessToken();
-
-    navigate("/login", {
-      replace: true,
-    });
-  };
-
-  /**
    * 初回表示時に
    * ケアマネジャーダッシュボード情報を取得する。
    */
@@ -176,9 +160,7 @@ export function CareManagerDashboardPage() {
           error,
         );
 
-        setError(
-          "ケアマネジャーダッシュボードの取得に失敗しました。",
-        );
+        setError("ケアマネジャーダッシュボードの取得に失敗しました。");
       })
       .finally(() => {
         if (cancelled) {
@@ -253,99 +235,247 @@ export function CareManagerDashboardPage() {
 
   return (
     <Container
-      maxWidth="lg"
+      maxWidth="xl"
       sx={{
-        py: 4,
+        py: {
+          xs: 3,
+          md: 4,
+        },
       }}
     >
       <Stack spacing={3}>
-        {/* ヘッダー */}
+        {/* ウェルカムエリア */}
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 2,
+            position: "relative",
+            overflow: "hidden",
+            px: {
+              xs: 3,
+              md: 4,
+            },
+            py: {
+              xs: 3,
+              md: 4,
+            },
+            borderRadius: 5,
+            background:
+              "linear-gradient(135deg, #EEF2FF 0%, #FFF1EC 55%, #E8F7F5 100%)",
           }}
         >
-          <Typography
-            variant="h5"
-            component="h1"
-          >
-            ケアマネジャーダッシュボード
-          </Typography>
+          {/* 背景装飾 */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: -40,
+              right: -20,
+              width: 150,
+              height: 150,
+              borderRadius: "50%",
+              bgcolor: "rgba(255, 255, 255, 0.55)",
+            }}
+          />
 
-          <Button
-            variant="outlined"
-            onClick={handleLogout}
+          <Box
+            sx={{
+              position: "relative",
+              zIndex: 1,
+            }}
           >
-            ログアウト
-          </Button>
-        </Box>
-
-        {/* ケアマネジャー基本情報 */}
-        <Card>
-          <CardContent>
             <Typography
-              variant="h6"
-              gutterBottom
+              variant="body2"
+              sx={{
+                mb: 1,
+                fontWeight: 700,
+                color: "primary.main",
+              }}
             >
-              ケアマネジャー情報
+              CARE MANAGER
             </Typography>
 
-            <Stack spacing={1}>
-              <Typography>
-                所属事業所：
-                {careManager.organizationName}
-              </Typography>
-
-              <Typography>
-                資格番号：
-                {careManager.licenseNumber ?? "未登録"}
-              </Typography>
-            </Stack>
-          </CardContent>
-        </Card>
-
-        {/* 施設探し案件 */}
-        <Card>
-          <CardContent>
             <Typography
-              variant="h6"
-              gutterBottom
+              variant="h4"
+              component="h1"
+              sx={{
+                mb: 1,
+              }}
             >
-              施設探し案件
+              おつかれさまです 👋
             </Typography>
 
             <Typography
               color="text.secondary"
               sx={{
-                mb: 2,
+                maxWidth: 600,
               }}
             >
-              利用者ごとの入居条件を管理し、条件に合う施設を検索します。
+              施設探しや問い合わせ状況をここからまとめて確認できます。
+              今日の業務もスムーズに進めていきましょう。
             </Typography>
+          </Box>
+        </Box>
 
-            <Button
-              variant="contained"
-              onClick={() => {
-                navigate("/placement-cases");
+        {/* 基本情報・施設探し案件 */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              md: "1fr 1fr",
+            },
+            gap: 3,
+          }}
+        >
+          {/* ケアマネジャー基本情報 */}
+          <Card
+            sx={{
+              height: "100%",
+            }}
+          >
+            <CardContent
+              sx={{
+                height: "100%",
+                p: {
+                  xs: 3,
+                  md: 3.5,
+                },
               }}
             >
-              施設探し案件を見る
-            </Button>
-          </CardContent>
-        </Card>
+              <Stack spacing={2}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      display: "grid",
+                      placeItems: "center",
+                      borderRadius: 3,
+                      bgcolor: "primary.light",
+                      fontSize: 22,
+                    }}
+                  >
+                    👤
+                  </Box>
+
+                  <Typography variant="h6">ケアマネジャー情報</Typography>
+                </Box>
+
+                <Stack spacing={1}>
+                  <Typography>
+                    所属事業所：
+                    {careManager.organizationName}
+                  </Typography>
+
+                  <Typography>
+                    資格番号：
+                    {careManager.licenseNumber ?? "未登録"}
+                  </Typography>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+
+          {/* 施設探し案件 */}
+          <Card
+            sx={{
+              height: "100%",
+            }}
+          >
+            <CardContent
+              sx={{
+                height: "100%",
+                p: {
+                  xs: 3,
+                  md: 3.5,
+                },
+              }}
+            >
+              <Stack
+                spacing={2}
+                sx={{
+                  height: "100%",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      display: "grid",
+                      placeItems: "center",
+                      borderRadius: 3,
+                      bgcolor: "secondary.light",
+                      fontSize: 22,
+                    }}
+                  >
+                    📋
+                  </Box>
+
+                  <Typography variant="h6">施設探し案件</Typography>
+                </Box>
+
+                <Typography color="text.secondary">
+                  利用者ごとの入居条件を管理し、条件に合う施設を検索します。
+                </Typography>
+
+                <Box
+                  sx={{
+                    mt: "auto !important",
+                  }}
+                >
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      navigate("/placement-cases");
+                    }}
+                  >
+                    施設探し案件を見る
+                  </Button>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Box>
 
         {/* 問い合わせサマリー */}
         <Card>
-          <CardContent>
-            <Typography
-              variant="h6"
-              gutterBottom
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+            }}
+          >
+            {/* セクションタイトル */}
+            <Box
+              sx={{
+                mb: 2.5,
+              }}
             >
-              問い合わせ状況
-            </Typography>
+              <Typography variant="h6">問い合わせ状況</Typography>
+
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{
+                  mt: 0.5,
+                }}
+              >
+                現在の問い合わせ状況を確認できます。
+              </Typography>
+            </Box>
 
             <Box
               sx={{
@@ -359,137 +489,413 @@ export function CareManagerDashboardPage() {
               }}
             >
               {/* 全問い合わせ */}
-              <Card variant="outlined">
+              <Card
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  bgcolor: "primary.light",
+                  border: "1px solid",
+                  borderColor: "rgba(99, 102, 241, 0.14)",
+                  boxShadow: "none",
+                }}
+              >
                 <CardActionArea
                   onClick={() => {
                     navigate("/inquiries");
                   }}
                   sx={{
                     height: "100%",
+                    borderRadius: "inherit",
                   }}
                 >
-                  <CardContent>
-                    <Typography
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      全問い合わせ
-                    </Typography>
-
-                    <Typography variant="h4">
-                      {inquirySummary.totalCount}
-
-                      <Typography
-                        component="span"
+                  <CardContent
+                    sx={{
+                      p: 2.5,
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      {/* タイトル + アイコン */}
+                      <Box
                         sx={{
-                          ml: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
                         }}
                       >
-                        件
+                        <Typography
+                          sx={{
+                            fontWeight: 700,
+                            color: "primary.dark",
+                          }}
+                        >
+                          全問い合わせ
+                        </Typography>
+
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            display: "grid",
+                            placeItems: "center",
+                            borderRadius: 2.5,
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            fontSize: 19,
+                          }}
+                        >
+                          💬
+                        </Box>
+                      </Box>
+
+                      {/* 件数 */}
+                      <Box>
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: {
+                              xs: "2rem",
+                              md: "2.25rem",
+                            },
+                            lineHeight: 1,
+                            fontWeight: 800,
+                            color: "text.primary",
+                          }}
+                        >
+                          {inquirySummary.totalCount}
+                        </Typography>
+
+                        <Typography
+                          component="span"
+                          sx={{
+                            ml: 0.5,
+                            fontWeight: 700,
+                            color: "text.secondary",
+                          }}
+                        >
+                          件
+                        </Typography>
+                      </Box>
+
+                      {/* 導線 */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: "primary.dark",
+                        }}
+                      >
+                        すべて確認 →
                       </Typography>
-                    </Typography>
+                    </Stack>
                   </CardContent>
                 </CardActionArea>
               </Card>
 
               {/* 未対応 */}
-              <Card variant="outlined">
+              <Card
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  bgcolor: "warning.light",
+                  border: "1px solid",
+                  borderColor: "rgba(255, 202, 88, 0.35)",
+                  boxShadow: "none",
+                }}
+              >
                 <CardActionArea
                   onClick={() => {
                     navigate("/inquiries?status=OPEN");
                   }}
                   sx={{
                     height: "100%",
+                    borderRadius: "inherit",
                   }}
                 >
-                  <CardContent>
-                    <Typography
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      未対応
-                    </Typography>
-
-                    <Typography variant="h4">
-                      {inquirySummary.openCount}
-
-                      <Typography
-                        component="span"
+                  <CardContent
+                    sx={{
+                      p: 2.5,
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      {/* タイトル + アイコン */}
+                      <Box
                         sx={{
-                          ml: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
                         }}
                       >
-                        件
+                        <Typography
+                          sx={{
+                            fontWeight: 700,
+                            color: "warning.dark",
+                          }}
+                        >
+                          未対応
+                        </Typography>
+
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            display: "grid",
+                            placeItems: "center",
+                            borderRadius: 2.5,
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            fontSize: 19,
+                          }}
+                        >
+                          🕐
+                        </Box>
+                      </Box>
+
+                      {/* 件数 */}
+                      <Box>
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: {
+                              xs: "2rem",
+                              md: "2.25rem",
+                            },
+                            lineHeight: 1,
+                            fontWeight: 800,
+                            color: "text.primary",
+                          }}
+                        >
+                          {inquirySummary.openCount}
+                        </Typography>
+
+                        <Typography
+                          component="span"
+                          sx={{
+                            ml: 0.5,
+                            fontWeight: 700,
+                            color: "text.secondary",
+                          }}
+                        >
+                          件
+                        </Typography>
+                      </Box>
+
+                      {/* 導線 */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: "warning.dark",
+                        }}
+                      >
+                        確認する →
                       </Typography>
-                    </Typography>
+                    </Stack>
                   </CardContent>
                 </CardActionArea>
               </Card>
 
               {/* 対応中 */}
-              <Card variant="outlined">
+              <Card
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  bgcolor: "info.light",
+                  border: "1px solid",
+                  borderColor: "rgba(77, 163, 255, 0.22)",
+                  boxShadow: "none",
+                }}
+              >
                 <CardActionArea
                   onClick={() => {
                     navigate("/inquiries?status=IN_PROGRESS");
                   }}
                   sx={{
                     height: "100%",
+                    borderRadius: "inherit",
                   }}
                 >
-                  <CardContent>
-                    <Typography
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      対応中
-                    </Typography>
-
-                    <Typography variant="h4">
-                      {inquirySummary.inProgressCount}
-
-                      <Typography
-                        component="span"
+                  <CardContent
+                    sx={{
+                      p: 2.5,
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      {/* タイトル + アイコン */}
+                      <Box
                         sx={{
-                          ml: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
                         }}
                       >
-                        件
+                        <Typography
+                          sx={{
+                            fontWeight: 700,
+                            color: "info.dark",
+                          }}
+                        >
+                          対応中
+                        </Typography>
+
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            display: "grid",
+                            placeItems: "center",
+                            borderRadius: 2.5,
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            fontSize: 19,
+                          }}
+                        >
+                          🔄
+                        </Box>
+                      </Box>
+
+                      {/* 件数 */}
+                      <Box>
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: {
+                              xs: "2rem",
+                              md: "2.25rem",
+                            },
+                            lineHeight: 1,
+                            fontWeight: 800,
+                            color: "text.primary",
+                          }}
+                        >
+                          {inquirySummary.inProgressCount}
+                        </Typography>
+
+                        <Typography
+                          component="span"
+                          sx={{
+                            ml: 0.5,
+                            fontWeight: 700,
+                            color: "text.secondary",
+                          }}
+                        >
+                          件
+                        </Typography>
+                      </Box>
+
+                      {/* 導線 */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: "info.dark",
+                        }}
+                      >
+                        対応を確認 →
                       </Typography>
-                    </Typography>
+                    </Stack>
                   </CardContent>
                 </CardActionArea>
               </Card>
 
               {/* 回答済み */}
-              <Card variant="outlined">
+              <Card
+                elevation={0}
+                sx={{
+                  height: "100%",
+                  bgcolor: "success.light",
+                  border: "1px solid",
+                  borderColor: "rgba(77, 182, 172, 0.25)",
+                  boxShadow: "none",
+                }}
+              >
                 <CardActionArea
                   onClick={() => {
                     navigate("/inquiries?status=ANSWERED");
                   }}
                   sx={{
                     height: "100%",
+                    borderRadius: "inherit",
                   }}
                 >
-                  <CardContent>
-                    <Typography
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      回答済み
-                    </Typography>
-
-                    <Typography variant="h4">
-                      {inquirySummary.answeredCount}
-
-                      <Typography
-                        component="span"
+                  <CardContent
+                    sx={{
+                      p: 2.5,
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      {/* タイトル + アイコン */}
+                      <Box
                         sx={{
-                          ml: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
                         }}
                       >
-                        件
+                        <Typography
+                          sx={{
+                            fontWeight: 700,
+                            color: "success.dark",
+                          }}
+                        >
+                          回答済み
+                        </Typography>
+
+                        <Box
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            display: "grid",
+                            placeItems: "center",
+                            borderRadius: 2.5,
+                            bgcolor: "rgba(255, 255, 255, 0.72)",
+                            fontSize: 19,
+                          }}
+                        >
+                          ✅
+                        </Box>
+                      </Box>
+
+                      {/* 件数 */}
+                      <Box>
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: {
+                              xs: "2rem",
+                              md: "2.25rem",
+                            },
+                            lineHeight: 1,
+                            fontWeight: 800,
+                            color: "text.primary",
+                          }}
+                        >
+                          {inquirySummary.answeredCount}
+                        </Typography>
+
+                        <Typography
+                          component="span"
+                          sx={{
+                            ml: 0.5,
+                            fontWeight: 700,
+                            color: "text.secondary",
+                          }}
+                        >
+                          件
+                        </Typography>
+                      </Box>
+
+                      {/* 導線 */}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: "success.dark",
+                        }}
+                      >
+                        回答を確認 →
                       </Typography>
-                    </Typography>
+                    </Stack>
                   </CardContent>
                 </CardActionArea>
               </Card>
@@ -511,11 +917,15 @@ export function CareManagerDashboardPage() {
 
         {/* 最近の問い合わせ */}
         <Card>
-          <CardContent>
-            <Typography
-              variant="h6"
-              gutterBottom
-            >
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+            }}
+          >
+            <Typography variant="h6" gutterBottom>
               最近の問い合わせ
             </Typography>
 
@@ -531,34 +941,34 @@ export function CareManagerDashboardPage() {
                     role="button"
                     tabIndex={0}
                     onClick={() => {
-                      navigate(
-                        `/inquiries/${inquiry.inquiryId}`,
-                      );
+                      navigate(`/inquiries/${inquiry.inquiryId}`);
                     }}
                     onKeyDown={(event) => {
-                      if (
-                        event.key === "Enter" ||
-                        event.key === " "
-                      ) {
+                      if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-
-                        navigate(
-                          `/inquiries/${inquiry.inquiryId}`,
-                        );
+                        navigate(`/inquiries/${inquiry.inquiryId}`);
                       }
                     }}
                     sx={{
-                      p: 2,
+                      p: {
+                        xs: 2,
+                        md: 2.5,
+                      },
                       border: 1,
                       borderColor: "divider",
-                      borderRadius: 1,
+                      borderRadius: 3,
+                      bgcolor: "background.paper",
                       cursor: "pointer",
                       transition:
-                        "background-color 0.2s ease, border-color 0.2s ease",
+                        "background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease",
+
                       "&:hover": {
-                        backgroundColor: "action.hover",
+                        bgcolor: "primary.light",
                         borderColor: "primary.main",
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 6px 18px rgba(99, 102, 241, 0.10)",
                       },
+
                       "&:focus-visible": {
                         outline: "2px solid",
                         outlineColor: "primary.main",
@@ -566,67 +976,107 @@ export function CareManagerDashboardPage() {
                       },
                     }}
                   >
-                    {/* 件名 */}
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                      }}
-                    >
-                      {inquiry.subject}
-                    </Typography>
-
-                    {/* 施設名 */}
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        mt: 0.5,
-                      }}
-                    >
-                      施設：
-                      {inquiry.facilityName}
-                    </Typography>
-
-                    {/* 最終更新日時 */}
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        mt: 0.5,
-                      }}
-                    >
-                      最終更新：
-                      {formatDateTime(
-                        inquiry.lastMessageAt,
-                      )}
-                    </Typography>
-
-                    {/* ステータス */}
                     <Box
                       sx={{
                         display: "flex",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        gap: 1,
-                        mt: 1,
+                        alignItems: "flex-start",
+                        gap: 2,
                       }}
                     >
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
+                      {/* 問い合わせアイコン */}
+                      <Box
+                        sx={{
+                          width: 42,
+                          height: 42,
+                          flexShrink: 0,
+                          display: "grid",
+                          placeItems: "center",
+                          borderRadius: 3,
+                          bgcolor: "primary.light",
+                          fontSize: 20,
+                        }}
                       >
-                        ステータス：
-                      </Typography>
+                        💬
+                      </Box>
 
-                      <Chip
-                        label={getInquiryStatusLabel(
-                          inquiry.status,
-                        )}
-                        color={getInquiryStatusColor(
-                          inquiry.status,
-                        )}
-                        size="small"
-                      />
+                      {/* 問い合わせ情報 */}
+                      <Box
+                        sx={{
+                          flexGrow: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        {/* 件名 + ステータス */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: {
+                              xs: "column",
+                              sm: "row",
+                            },
+                            alignItems: {
+                              xs: "flex-start",
+                              sm: "center",
+                            },
+                            justifyContent: "space-between",
+                            gap: 1,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                              color: "text.primary",
+                            }}
+                          >
+                            {inquiry.subject}
+                          </Typography>
+
+                          <Chip
+                            label={getInquiryStatusLabel(inquiry.status)}
+                            color={getInquiryStatusColor(inquiry.status)}
+                            size="small"
+                          />
+                        </Box>
+
+                        {/* 施設名 */}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mt: 1,
+                          }}
+                        >
+                          🏠 {inquiry.facilityName}
+                        </Typography>
+
+                        {/* 最終更新 */}
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{
+                            mt: 0.5,
+                          }}
+                        >
+                          🕐 {formatDateTime(inquiry.lastMessageAt)}
+                        </Typography>
+                      </Box>
+
+                      {/* 詳細画面への視覚的な導線 */}
+                      <Typography
+                        aria-hidden="true"
+                        sx={{
+                          display: {
+                            xs: "none",
+                            sm: "block",
+                          },
+                          alignSelf: "center",
+                          color: "text.secondary",
+                          fontSize: 20,
+                          fontWeight: 700,
+                        }}
+                      >
+                        ›
+                      </Typography>
                     </Box>
                   </Box>
                 ))}
@@ -637,31 +1087,49 @@ export function CareManagerDashboardPage() {
 
         {/* 施設検索 */}
         <Card>
-          <CardContent>
-            <Typography
-              variant="h6"
-              gutterBottom
-            >
-              施設を探す
-            </Typography>
-
-            <Typography
-              color="text.secondary"
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+            }}
+          >
+            <Box
               sx={{
-                mb: 2,
+                display: "flex",
+                flexDirection: {
+                  xs: "column",
+                  sm: "row",
+                },
+                alignItems: {
+                  xs: "flex-start",
+                  sm: "center",
+                },
+                justifyContent: "space-between",
+                gap: 2,
               }}
             >
-              空床状況や受け入れ条件から施設を検索できます。
-            </Typography>
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  🔍 施設を探す
+                </Typography>
 
-            <Button
-              variant="contained"
-              onClick={() => {
-                navigate("/facilities");
-              }}
-            >
-              施設を検索する
-            </Button>
+                <Typography color="text.secondary">
+                  空床状況や受け入れ条件から施設を検索できます。
+                </Typography>
+              </Box>
+
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={() => {
+                  navigate("/facilities");
+                }}
+              >
+                施設を検索する
+              </Button>
+            </Box>
           </CardContent>
         </Card>
       </Stack>

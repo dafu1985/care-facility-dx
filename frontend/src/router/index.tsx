@@ -1,5 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 
+import { AuthenticatedLayout } from "../components/layout/AuthenticatedLayout";
+
 import { RequireAuth } from "../features/auth/components/RequireAuth";
 import { HomePage } from "../features/auth/pages/HomePage";
 import { LoginPage } from "../features/auth/pages/LoginPage";
@@ -22,9 +24,7 @@ import { PlacementCaseListPage } from "../features/placement-cases/pages/Placeme
  */
 export const router = createBrowserRouter([
   /**
-   * ログイン画面。
-   *
-   * 未認証状態でもアクセス可能。
+   * 未認証ユーザーもアクセスできるログイン画面。
    */
   {
     path: "/login",
@@ -32,137 +32,62 @@ export const router = createBrowserRouter([
   },
 
   /**
-   * ログイン後ホーム。
-   */
-  {
-    path: "/",
-    element: (
-      <RequireAuth>
-        <HomePage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 問い合わせ一覧。
-   */
-  {
-    path: "/inquiries",
-    element: (
-      <RequireAuth>
-        <InquiryListPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 問い合わせ詳細。
-   */
-  {
-    path: "/inquiries/:inquiryId",
-    element: (
-      <RequireAuth>
-        <InquiryDetailPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設検索。
-   */
-  {
-    path: "/facilities",
-    element: (
-      <RequireAuth>
-        <FacilitySearchPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設詳細。
-   */
-  {
-    path: "/facilities/:facilityId",
-    element: (
-      <RequireAuth>
-        <FacilityDetailPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設への問い合わせ作成。
-   */
-  {
-    path: "/facilities/:facilityId/inquiry",
-    element: (
-      <RequireAuth>
-        <InquiryCreatePage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設探し案件一覧。
-   */
-  {
-    path: "/placement-cases",
-    element: (
-      <RequireAuth>
-        <PlacementCaseListPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設探し案件新規作成。
+   * ログイン後の画面。
    *
-   * :placementCaseId より前に定義し、
-   * "new" が案件IDとして解釈されないようにする。
+   * RequireAuthで認証を確認し、
+   * AuthenticatedLayoutを全ページで共有する。
    */
   {
-    path: "/placement-cases/new",
     element: (
       <RequireAuth>
-        <PlacementCaseCreatePage />
+        <AuthenticatedLayout />
       </RequireAuth>
     ),
-  },
-
-  /**
-   * 利用者条件の登録・編集。
-   */
-  {
-    path: "/placement-cases/:placementCaseId/conditions",
-    element: (
-      <RequireAuth>
-        <ClientConditionEditPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 医療条件の登録・編集。
-   */
-  {
-    path: "/placement-cases/:placementCaseId/medical-requirements",
-    element: (
-      <RequireAuth>
-        <MedicalRequirementsEditPage />
-      </RequireAuth>
-    ),
-  },
-
-  /**
-   * 施設探し案件詳細。
-   */
-  {
-    path: "/placement-cases/:placementCaseId",
-    element: (
-      <RequireAuth>
-        <PlacementCaseDetailPage />
-      </RequireAuth>
-    ),
+    children: [
+      {
+        path: "/",
+        element: <HomePage />,
+      },
+      {
+        path: "/inquiries",
+        element: <InquiryListPage />,
+      },
+      {
+        path: "/inquiries/:inquiryId",
+        element: <InquiryDetailPage />,
+      },
+      {
+        path: "/facilities",
+        element: <FacilitySearchPage />,
+      },
+      {
+        path: "/facilities/:facilityId",
+        element: <FacilityDetailPage />,
+      },
+      {
+        path: "/facilities/:facilityId/inquiry",
+        element: <InquiryCreatePage />,
+      },
+      {
+        path: "/placement-cases",
+        element: <PlacementCaseListPage />,
+      },
+      {
+        path: "/placement-cases/new",
+        element: <PlacementCaseCreatePage />,
+      },
+      {
+        path: "/placement-cases/:placementCaseId/conditions",
+        element: <ClientConditionEditPage />,
+      },
+      {
+        path: "/placement-cases/:placementCaseId/medical-requirements",
+        element: <MedicalRequirementsEditPage />,
+      },
+      {
+        path: "/placement-cases/:placementCaseId",
+        element: <PlacementCaseDetailPage />,
+      },
+    ],
   },
 ]);
