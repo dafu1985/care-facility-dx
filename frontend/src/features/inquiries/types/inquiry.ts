@@ -102,3 +102,40 @@ export interface InquiryListResponse {
 
   total: number;
 }
+
+/**
+ * 問い合わせごとの未読メッセージ情報。
+ */
+export interface InquiryUnreadItem {
+  inquiryId: string;
+
+  unreadCount: number;
+
+  /**
+   * BackendではDateだが、
+   * JSONレスポンスではISO形式の文字列になる。
+   */
+  latestUnreadMessageAt: string;
+}
+
+/**
+ * 未読メッセージサマリー。
+ *
+ * GET /inquiries/unread-summary
+ */
+export interface InquiryUnreadSummary {
+  /**
+   * 全問い合わせを合計した未読メッセージ件数。
+   */
+  totalUnreadCount: number;
+
+  /**
+   * 未読メッセージが存在する問い合わせ数。
+   */
+  unreadInquiryCount: number;
+
+  /**
+   * 問い合わせごとの未読情報。
+   */
+  inquiries: InquiryUnreadItem[];
+}

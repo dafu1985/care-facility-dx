@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 
 import { getAccessToken } from "../utils/token-storage";
+import { InquiryUnreadNotifier } from "../../inquiries/components/InquiryUnreadNotifier";
 
 interface RequireAuthProps {
   children: ReactNode;
@@ -24,5 +25,5 @@ export function RequireAuth({ children }: RequireAuthProps) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  return <InquiryUnreadNotifier>{children}</InquiryUnreadNotifier>;
 }

@@ -20,6 +20,7 @@ import type { AuthMeResponse } from "../../auth/types/auth";
 
 import { addInquiryMessage } from "../api/add-inquiry-message";
 import { getInquiry } from "../api/get-inquiry";
+import { markInquiryRead } from "../api/mark-inquiry-read";
 import { updateInquiryStatus } from "../api/update-inquiry-status";
 
 import type { Inquiry, InquiryMessage, InquiryStatus } from "../types/inquiry";
@@ -96,14 +97,28 @@ export function InquiryDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   /**
+   * 取得した問い合わせを画面へ反映し、
+   * 実際に取得・表示した最後のメッセージまで既読にする。
+   */
+  const applyInquiry = async (response: Inquiry) => {
+    setInquiry(response);
+    setStatus(response.status);
+
+    const lastMessage = response.messages.at(-1);
+
+    if (lastMessage) {
+      await markInquiryRead(response.inquiryId, lastMessage.messageId);
+    }
+  };
+
+  /**
    * 問い合わせ詳細を再取得する。
    */
   const refreshInquiry = async (targetInquiryId: string) => {
     try {
       const response = await getInquiry(targetInquiryId);
 
-      setInquiry(response);
-      setStatus(response.status);
+      await applyInquiry(response);
       setError(null);
     } catch (error) {
       console.error("問い合わせ詳細の取得に失敗しました。", error);
@@ -126,14 +141,12 @@ export function InquiryDetailPage() {
     let cancelled = false;
 
     Promise.all([getInquiry(inquiryId), getMe()])
-      .then(([inquiryResponse, userResponse]) => {
+      .then(async ([inquiryResponse, userResponse]) => {
         if (cancelled) {
           return;
         }
 
-        setInquiry(inquiryResponse);
-
-        setStatus(inquiryResponse.status);
+        await applyInquiry(inquiryResponse);
 
         setCurrentUser(userResponse);
 
