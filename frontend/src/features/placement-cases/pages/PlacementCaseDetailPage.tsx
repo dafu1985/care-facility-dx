@@ -7,7 +7,6 @@ import {
   Chip,
   CircularProgress,
   Container,
-  Divider,
   Stack,
   Typography,
 } from "@mui/material";
@@ -256,13 +255,6 @@ function getCareLevelLabel(careLevel: string | null): string {
   }
 
   return careLevel;
-}
-
-/**
- * boolean値を「あり・なし」で表示する。
- */
-function getBooleanLabel(value: boolean): string {
-  return value ? "あり" : "なし";
 }
 
 /**
@@ -593,198 +585,688 @@ export function PlacementCaseDetailPage() {
       }}
     >
       <Stack spacing={3}>
-        {/* 戻るボタン */}
+        {/* 戻るナビゲーション */}
         <Box>
           <Button
-            variant="outlined"
+            variant="text"
             onClick={() => {
               navigate("/placement-cases");
             }}
+            sx={{
+              px: 0,
+              color: "text.secondary",
+              "&:hover": {
+                bgcolor: "transparent",
+                color: "primary.main",
+              },
+            }}
           >
-            案件一覧へ戻る
+            ← 施設探し案件へ戻る
           </Button>
         </Box>
 
-        {/* ヘッダー */}
+        {/* 案件ヘッダー */}
         <Box
           sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: {
-              xs: "flex-start",
-              sm: "center",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 4,
+            px: {
+              xs: 3,
+              md: 4,
             },
-            flexDirection: {
-              xs: "column",
-              sm: "row",
+            py: {
+              xs: 3,
+              md: 4,
             },
-            gap: 2,
+            background:
+              "linear-gradient(135deg, #EEF2FF 0%, #FFF1EC 55%, #E8F7F5 100%)",
           }}
         >
-          <Box>
-            <Typography variant="h5" component="h1">
-              {placementCase.caseCode}
-            </Typography>
-
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{
-                mt: 0.5,
-              }}
-            >
-              施設探し案件の詳細
-            </Typography>
-          </Box>
-
-          <Chip
-            label={getPlacementCaseStatusLabel(placementCase.status)}
-            color={getPlacementCaseStatusColor(placementCase.status)}
+          {/* 背景装飾 */}
+          <Box
+            sx={{
+              position: "absolute",
+              width: 180,
+              height: 180,
+              borderRadius: "50%",
+              bgcolor: "rgba(255,255,255,0.45)",
+              top: -90,
+              right: -40,
+            }}
           />
+
+          <Box
+            sx={{
+              position: "relative",
+              zIndex: 1,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: {
+                xs: "flex-start",
+                sm: "center",
+              },
+              flexDirection: {
+                xs: "column",
+                sm: "row",
+              },
+              gap: 2,
+            }}
+          >
+            <Stack spacing={1}>
+              <Typography
+                variant="overline"
+                sx={{
+                  color: "primary.main",
+                  fontWeight: 800,
+                  letterSpacing: "0.12em",
+                }}
+              >
+                PLACEMENT CASE
+              </Typography>
+
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{
+                  alignItems: "center",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 3,
+                    bgcolor: "rgba(255,255,255,0.75)",
+                    fontSize: "1.4rem",
+                  }}
+                >
+                  📋
+                </Box>
+
+                <Box>
+                  <Typography
+                    variant="h4"
+                    component="h1"
+                    sx={{
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {placementCase.caseCode}
+                  </Typography>
+
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                    }}
+                  >
+                    施設探し案件の詳細
+                  </Typography>
+                </Box>
+              </Stack>
+            </Stack>
+
+            <Chip
+              label={getPlacementCaseStatusLabel(placementCase.status)}
+              color={getPlacementCaseStatusColor(placementCase.status)}
+              sx={{
+                fontWeight: 700,
+              }}
+            />
+          </Box>
         </Box>
 
         {/* 案件基本情報 */}
         <Card>
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="h6">案件基本情報</Typography>
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+              "&:last-child": {
+                pb: {
+                  xs: 3,
+                  md: 3.5,
+                },
+              },
+            }}
+          >
+            <Stack spacing={3}>
+              {/* セクションタイトル */}
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{
+                  alignItems: "center",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 3,
+                    bgcolor: "primary.light",
+                    fontSize: "1.25rem",
+                  }}
+                >
+                  📋
+                </Box>
 
-              <Divider />
+                <Box>
+                  <Typography variant="h6">案件基本情報</Typography>
 
-              <Stack spacing={1.5}>
-                <Typography>
-                  <strong>案件コード：</strong>
-                  {placementCase.caseCode}
+                  <Typography variant="body2" color="text.secondary">
+                    この施設探し案件の基本情報です。
+                  </Typography>
+                </Box>
+              </Stack>
+
+              {/* 基本情報 */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                  },
+                  gap: 2,
+                }}
+              >
+                {/* 案件コード */}
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    🏷️ 案件コード
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {placementCase.caseCode}
+                  </Typography>
+                </Box>
+
+                {/* ステータス */}
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    📌 ステータス
+                  </Typography>
+
+                  <Box sx={{ mt: 0.75 }}>
+                    <Chip
+                      label={getPlacementCaseStatusLabel(placementCase.status)}
+                      color={getPlacementCaseStatusColor(placementCase.status)}
+                      size="small"
+                    />
+                  </Box>
+                </Box>
+
+                {/* 入居希望日 */}
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    📅 入居希望日
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {formatDate(placementCase.desiredMoveInDate)}
+                  </Typography>
+                </Box>
+
+                {/* 緊急度 */}
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 3,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    ⚡ 緊急度
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {getUrgencyLabel(placementCase.urgency)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* メモ */}
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: "secondary.light",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  📝 メモ
                 </Typography>
 
-                <Typography>
-                  <strong>ステータス：</strong>
-                  {getPlacementCaseStatusLabel(placementCase.status)}
-                </Typography>
-
-                <Typography>
-                  <strong>入居希望日：</strong>
-                  {formatDate(placementCase.desiredMoveInDate)}
-                </Typography>
-
-                <Typography>
-                  <strong>緊急度：</strong>
-                  {getUrgencyLabel(placementCase.urgency)}
-                </Typography>
-
-                <Typography>
-                  <strong>メモ：</strong>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    mt: 0.75,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
                   {placementCase.note ?? "未設定"}
                 </Typography>
+              </Box>
 
-                <Typography variant="body2" color="text.secondary">
+              {/* 日時 */}
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: {
+                    xs: "column",
+                    sm: "row",
+                  },
+                  justifyContent: "space-between",
+                  gap: 1,
+                  pt: 0.5,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary">
                   作成日：
                   {formatDate(placementCase.createdAt)}
                 </Typography>
 
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="caption" color="text.secondary">
                   最終更新：
                   {formatDate(placementCase.updatedAt)}
                 </Typography>
-              </Stack>
+              </Box>
             </Stack>
           </CardContent>
         </Card>
 
         {/* 利用者条件 */}
         <Card>
-          <CardContent>
-            <Stack spacing={2}>
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+              "&:last-child": {
+                pb: {
+                  xs: 3,
+                  md: 3.5,
+                },
+              },
+            }}
+          >
+            <Stack spacing={3}>
+              {/* セクションヘッダー */}
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
+                  alignItems: {
+                    xs: "flex-start",
+                    sm: "center",
+                  },
+                  flexDirection: {
+                    xs: "column",
+                    sm: "row",
+                  },
                   gap: 2,
                 }}
               >
-                <Typography variant="h6">利用者条件</Typography>
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  sx={{
+                    alignItems: "center",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 3,
+                      bgcolor: "secondary.light",
+                      fontSize: "1.25rem",
+                    }}
+                  >
+                    👤
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6">利用者条件</Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      施設探しに使用する利用者の希望条件です。
+                    </Typography>
+                  </Box>
+                </Stack>
 
                 <Button
                   variant="outlined"
                   size="small"
                   onClick={() => {
-                    navigate(
-                      `/placement-cases/${placementCaseId}/conditions`,
-                    );
+                    navigate(`/placement-cases/${placementCaseId}/conditions`);
                   }}
                 >
-                  {clientCondition ? "利用者条件を編集" : "利用者条件を登録"}
+                  {clientCondition ? "条件を編集" : "利用者条件を登録"}
                 </Button>
               </Box>
 
-              <Divider />
-
               {!clientCondition ? (
-                <Alert severity="warning">
-                  利用者条件が登録されていません。
-                </Alert>
-              ) : (
+                /* 未登録 */
                 <Box
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "1fr",
-                      sm: "repeat(2, 1fr)",
-                    },
-                    gap: 2,
+                    p: 3,
+                    borderRadius: 3,
+                    bgcolor: "warning.light",
+                    textAlign: "center",
                   }}
                 >
-                  <Typography>
-                    <strong>年代：</strong>
-                    {getAgeGroupLabel(clientCondition.ageGroup)}
+                  <Typography
+                    sx={{
+                      fontSize: "2rem",
+                      mb: 1,
+                    }}
+                  >
+                    👤
                   </Typography>
 
-                  <Typography>
-                    <strong>性別：</strong>
-                    {getGenderLabel(clientCondition.gender)}
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                    }}
+                  >
+                    利用者条件が登録されていません
                   </Typography>
 
-                  <Typography>
-                    <strong>要介護度：</strong>
-                    {getCareLevelLabel(clientCondition.careLevel)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>月額予算上限：</strong>
-                    {formatCurrency(clientCondition.budgetMax)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>希望地域：</strong>
-                    {clientCondition.desiredArea ?? "未設定"}
-                  </Typography>
-
-                  <Typography>
-                    <strong>生活保護：</strong>
-                    {getBooleanLabel(clientCondition.publicAssistance)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>身元保証人：</strong>
-                    {getBooleanLabel(clientCondition.guarantorAvailable)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>認知症：</strong>
-                    {getBooleanLabel(clientCondition.dementia)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>看取り希望：</strong>
-                    {getBooleanLabel(clientCondition.endOfLifeCare)}
-                  </Typography>
-
-                  <Typography>
-                    <strong>入居希望日：</strong>
-                    {formatDate(clientCondition.desiredMoveInDate)}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                    }}
+                  >
+                    マッチングを行うために利用者条件を登録してください。
                   </Typography>
                 </Box>
+              ) : (
+                <Stack spacing={2}>
+                  {/* 主要条件 */}
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: {
+                        xs: "1fr",
+                        sm: "repeat(2, minmax(0, 1fr))",
+                        md: "repeat(3, minmax(0, 1fr))",
+                      },
+                      gap: 2,
+                    }}
+                  >
+                    {/* 年代 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        🎂 年代
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getAgeGroupLabel(clientCondition.ageGroup)}
+                      </Typography>
+                    </Box>
+
+                    {/* 性別 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        👤 性別
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getGenderLabel(clientCondition.gender)}
+                      </Typography>
+                    </Box>
+
+                    {/* 要介護度 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        ♿ 要介護度
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {getCareLevelLabel(clientCondition.careLevel)}
+                      </Typography>
+                    </Box>
+
+                    {/* 月額予算 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        💴 月額予算上限
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {formatCurrency(clientCondition.budgetMax)}
+                      </Typography>
+                    </Box>
+
+                    {/* 希望地域 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        📍 希望地域
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {clientCondition.desiredArea ?? "未設定"}
+                      </Typography>
+                    </Box>
+
+                    {/* 入居希望日 */}
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor: "background.default",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        📅 入居希望日
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          mt: 0.5,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {formatDate(clientCondition.desiredMoveInDate)}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* 補足条件 */}
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 3,
+                      bgcolor: "#F8F9FD",
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{
+                        display: "block",
+                        mb: 1.5,
+                      }}
+                    >
+                      その他の条件
+                    </Typography>
+
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      useFlexGap
+                      sx={{
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Chip
+                        size="small"
+                        label={`生活保護 ${
+                          clientCondition.publicAssistance ? "あり" : "なし"
+                        }`}
+                        color={
+                          clientCondition.publicAssistance
+                            ? "success"
+                            : "default"
+                        }
+                        variant={
+                          clientCondition.publicAssistance
+                            ? "filled"
+                            : "outlined"
+                        }
+                      />
+
+                      <Chip
+                        size="small"
+                        label={`身元保証人 ${
+                          clientCondition.guarantorAvailable ? "あり" : "なし"
+                        }`}
+                        color={
+                          clientCondition.guarantorAvailable
+                            ? "success"
+                            : "default"
+                        }
+                        variant={
+                          clientCondition.guarantorAvailable
+                            ? "filled"
+                            : "outlined"
+                        }
+                      />
+
+                      <Chip
+                        size="small"
+                        label={`認知症 ${
+                          clientCondition.dementia ? "あり" : "なし"
+                        }`}
+                        color={clientCondition.dementia ? "warning" : "default"}
+                        variant={
+                          clientCondition.dementia ? "filled" : "outlined"
+                        }
+                      />
+
+                      <Chip
+                        size="small"
+                        label={`看取り希望 ${
+                          clientCondition.endOfLifeCare ? "あり" : "なし"
+                        }`}
+                        color={
+                          clientCondition.endOfLifeCare ? "info" : "default"
+                        }
+                        variant={
+                          clientCondition.endOfLifeCare ? "filled" : "outlined"
+                        }
+                      />
+                    </Stack>
+                  </Box>
+                </Stack>
               )}
             </Stack>
           </CardContent>
@@ -792,17 +1274,68 @@ export function PlacementCaseDetailPage() {
 
         {/* 医療条件 */}
         <Card>
-          <CardContent>
-            <Stack spacing={2}>
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+              "&:last-child": {
+                pb: {
+                  xs: 3,
+                  md: 3.5,
+                },
+              },
+            }}
+          >
+            <Stack spacing={3}>
+              {/* セクションヘッダー */}
               <Box
                 sx={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
+                  alignItems: {
+                    xs: "flex-start",
+                    sm: "center",
+                  },
+                  flexDirection: {
+                    xs: "column",
+                    sm: "row",
+                  },
                   gap: 2,
                 }}
               >
-                <Typography variant="h6">医療条件</Typography>
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  sx={{
+                    alignItems: "center",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 3,
+                      bgcolor: "#E8F7F5",
+                      fontSize: "1.25rem",
+                    }}
+                  >
+                    🏥
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6">医療条件</Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      施設選定で考慮する医療対応条件です。
+                    </Typography>
+                  </Box>
+                </Stack>
 
                 <Button
                   variant="outlined"
@@ -815,15 +1348,49 @@ export function PlacementCaseDetailPage() {
                 >
                   {medicalRequirements.length === 0
                     ? "医療条件を登録"
-                    : "医療条件を編集"}
+                    : "条件を編集"}
                 </Button>
               </Box>
 
-              <Divider />
-
               {medicalRequirements.length === 0 ? (
-                <Alert severity="info">医療条件は登録されていません。</Alert>
+                /* 医療条件未登録 */
+                <Box
+                  sx={{
+                    p: 3,
+                    borderRadius: 3,
+                    bgcolor: "#F8F9FD",
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: "2rem",
+                      mb: 1,
+                    }}
+                  >
+                    🏥
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                    }}
+                  >
+                    医療条件は登録されていません
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                    }}
+                  >
+                    必要な医療対応がある場合は条件を登録してください。
+                  </Typography>
+                </Box>
               ) : (
+                /* 登録済み医療条件 */
                 <Stack spacing={1.5}>
                   {medicalRequirements.map((requirement) => (
                     <Box
@@ -839,21 +1406,68 @@ export function PlacementCaseDetailPage() {
                           xs: "column",
                           sm: "row",
                         },
-                        gap: 1,
-                        py: 1,
+                        gap: 2,
+                        p: 2,
+                        borderRadius: 3,
+                        bgcolor:
+                          requirement.requirementLevel === "REQUIRED"
+                            ? "#FFF5F3"
+                            : "#F3F7FF",
+                        border: "1px solid",
+                        borderColor:
+                          requirement.requirementLevel === "REQUIRED"
+                            ? "rgba(244, 67, 54, 0.12)"
+                            : "rgba(33, 150, 243, 0.12)",
                       }}
                     >
-                      <Box>
-                        <Typography sx={{ fontWeight: 600 }}>
-                          {requirement.medicalCondition.name}
-                        </Typography>
+                      <Stack
+                        direction="row"
+                        spacing={1.5}
+                        sx={{
+                          alignItems: "flex-start",
+                          minWidth: 0,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 2,
+                            bgcolor: "rgba(255,255,255,0.8)",
+                          }}
+                        >
+                          {requirement.requirementLevel === "REQUIRED"
+                            ? "⚕️"
+                            : "💙"}
+                        </Box>
 
-                        {requirement.note && (
-                          <Typography variant="body2" color="text.secondary">
-                            {requirement.note}
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            sx={{
+                              fontWeight: 700,
+                            }}
+                          >
+                            {requirement.medicalCondition.name}
                           </Typography>
-                        )}
-                      </Box>
+
+                          {requirement.note && (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.5,
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {requirement.note}
+                            </Typography>
+                          )}
+                        </Box>
+                      </Stack>
 
                       <Chip
                         size="small"
@@ -863,6 +1477,10 @@ export function PlacementCaseDetailPage() {
                         color={getMedicalRequirementLevelColor(
                           requirement.requirementLevel,
                         )}
+                        sx={{
+                          flexShrink: 0,
+                          fontWeight: 700,
+                        }}
                       />
                     </Box>
                   ))}
@@ -872,10 +1490,24 @@ export function PlacementCaseDetailPage() {
           </CardContent>
         </Card>
 
-        {/* マッチング */}
+        {/* マッチング・候補施設 */}
         <Card>
-          <CardContent>
-            <Stack spacing={2}>
+          <CardContent
+            sx={{
+              p: {
+                xs: 3,
+                md: 3.5,
+              },
+              "&:last-child": {
+                pb: {
+                  xs: 3,
+                  md: 3.5,
+                },
+              },
+            }}
+          >
+            <Stack spacing={3}>
+              {/* セクションヘッダー */}
               <Box
                 sx={{
                   display: "flex",
@@ -891,19 +1523,37 @@ export function PlacementCaseDetailPage() {
                   gap: 2,
                 }}
               >
-                <Box>
-                  <Typography variant="h6">候補施設</Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  sx={{
+                    alignItems: "center",
+                  }}
+                >
+                  <Box
                     sx={{
-                      mt: 0.5,
+                      width: 44,
+                      height: 44,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 3,
+                      bgcolor: "#EEF2FF",
+                      fontSize: "1.25rem",
                     }}
                   >
-                    登録した条件をもとに候補施設を検索します。
-                  </Typography>
-                </Box>
+                    🔍
+                  </Box>
+
+                  <Box>
+                    <Typography variant="h6">候補施設</Typography>
+
+                    <Typography variant="body2" color="text.secondary">
+                      登録した条件をもとに、入居候補となる施設を探します。
+                    </Typography>
+                  </Box>
+                </Stack>
 
                 <Button
                   variant="contained"
@@ -911,15 +1561,20 @@ export function PlacementCaseDetailPage() {
                   onClick={() => {
                     void handleRunMatching();
                   }}
+                  sx={{
+                    minWidth: {
+                      sm: 150,
+                    },
+                  }}
                 >
-                  {isMatching ? "検索中..." : "施設を検索"}
+                  {isMatching ? "検索中..." : "🔍 施設を検索"}
                 </Button>
               </Box>
 
-              <Divider />
-
+              {/* マッチングエラー */}
               {matchingError && <Alert severity="error">{matchingError}</Alert>}
 
+              {/* マッチング結果メッセージ */}
               {matchingMessage && (
                 <Alert
                   severity={candidateFacilities.length > 0 ? "success" : "info"}
@@ -928,71 +1583,233 @@ export function PlacementCaseDetailPage() {
                 </Alert>
               )}
 
+              {/* マッチング実行中 */}
               {isMatching && (
                 <Box
                   sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    py: 3,
+                    py: 5,
+                    textAlign: "center",
                   }}
                 >
-                  <CircularProgress size={32} />
+                  <CircularProgress size={36} />
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 2,
+                    }}
+                  >
+                    条件に合う施設を探しています...
+                  </Typography>
                 </Box>
               )}
 
+              {/* 候補施設なし */}
               {!isMatching && candidateFacilities.length === 0 && (
-                <Alert severity="info">
-                  候補施設はまだありません。「施設を検索」を押してマッチングを実行してください。
-                </Alert>
+                <Box
+                  sx={{
+                    py: 5,
+                    px: 3,
+                    borderRadius: 3,
+                    bgcolor: "#F8F9FD",
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: "2.5rem",
+                      mb: 1,
+                    }}
+                  >
+                    🏠
+                  </Typography>
+
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                    }}
+                  >
+                    候補施設はまだありません
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.75,
+                    }}
+                  >
+                    「施設を検索」を押すと、登録した条件をもとに候補施設を探します。
+                  </Typography>
+                </Box>
               )}
 
+              {/* 候補施設一覧 */}
               {!isMatching && candidateFacilities.length > 0 && (
                 <Stack spacing={2}>
-                  {candidateFacilities.map((candidate) => (
+                  {/* 件数 */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 2,
+                    }}
+                  >
+                    <Typography variant="body2" color="text.secondary">
+                      マッチ度の高い順に表示しています。
+                    </Typography>
+
+                    <Chip
+                      size="small"
+                      label={`${candidateFacilities.length}件`}
+                      color="primary"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 700,
+                      }}
+                    />
+                  </Box>
+
+                  {candidateFacilities.map((candidate, index) => (
                     <Card
                       key={candidate.candidateFacilityId}
                       variant="outlined"
+                      sx={{
+                        position: "relative",
+                        overflow: "hidden",
+                        borderRadius: 3,
+                        borderColor: index === 0 ? "primary.main" : "divider",
+                        transition:
+                          "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+                        "&:hover": {
+                          transform: "translateY(-2px)",
+                          boxShadow: 4,
+                          borderColor: "primary.main",
+                        },
+                      }}
                     >
-                      <CardContent>
-                        <Stack spacing={2}>
+                      {/* 1位候補 */}
+                      {index === 0 && (
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            px: 1.5,
+                            py: 0.5,
+                            bgcolor: "primary.main",
+                            color: "primary.contrastText",
+                            borderBottomRightRadius: 12,
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.05em",
+                          }}
+                        >
+                          TOP MATCH
+                        </Box>
+                      )}
+
+                      <CardContent
+                        sx={{
+                          p: {
+                            xs: 2.5,
+                            md: 3,
+                          },
+                          pt:
+                            index === 0
+                              ? {
+                                  xs: 5,
+                                  md: 5,
+                                }
+                              : undefined,
+                          "&:last-child": {
+                            pb: {
+                              xs: 2.5,
+                              md: 3,
+                            },
+                          },
+                        }}
+                      >
+                        <Stack spacing={2.5}>
+                          {/* 施設名・スコア */}
                           <Box
                             sx={{
                               display: "flex",
                               justifyContent: "space-between",
                               alignItems: {
                                 xs: "flex-start",
-                                sm: "center",
+                                md: "center",
                               },
                               flexDirection: {
                                 xs: "column",
-                                sm: "row",
+                                md: "row",
                               },
-                              gap: 1,
+                              gap: 2,
                             }}
                           >
-                            <Box>
-                              <Typography variant="h6" component="h3">
-                                {candidate.facility?.name ?? "施設名不明"}
-                              </Typography>
-
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
+                              sx={{
+                                alignItems: "flex-start",
+                                minWidth: 0,
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 44,
+                                  height: 44,
+                                  flexShrink: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: 3,
+                                  bgcolor: "#FFF1EC",
+                                  fontSize: "1.25rem",
+                                }}
                               >
-                                {candidate.facility?.area ?? "エリア未設定"}
-                              </Typography>
-                            </Box>
+                                🏠
+                              </Box>
+
+                              <Box
+                                sx={{
+                                  minWidth: 0,
+                                }}
+                              >
+                                <Typography variant="h6" component="h3">
+                                  {candidate.facility?.name ?? "施設名不明"}
+                                </Typography>
+
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{
+                                    mt: 0.25,
+                                  }}
+                                >
+                                  📍{" "}
+                                  {candidate.facility?.area ?? "エリア未設定"}
+                                </Typography>
+                              </Box>
+                            </Stack>
 
                             <Stack
                               direction="row"
                               spacing={1}
+                              useFlexGap
                               sx={{
                                 alignItems: "center",
+                                flexWrap: "wrap",
                               }}
                             >
                               <Chip
-                                label={`マッチスコア ${candidate.matchScore ?? 0}`}
+                                label={`MATCH ${candidate.matchScore ?? 0}`}
                                 color="primary"
+                                sx={{
+                                  fontWeight: 800,
+                                }}
                               />
 
                               <Chip
@@ -1003,80 +1820,169 @@ export function PlacementCaseDetailPage() {
                                   candidate.status,
                                 )}
                                 variant="outlined"
+                                sx={{
+                                  fontWeight: 700,
+                                }}
                               />
                             </Stack>
                           </Box>
 
-                          <Divider />
-
-                          <Stack spacing={1}>
-                            <Typography>
-                              <strong>住所：</strong>
-                              {candidate.facility?.address ?? "未設定"}
-                            </Typography>
-
-                            <Typography>
-                              <strong>電話番号：</strong>
-                              {candidate.facility?.phone ?? "未設定"}
-                            </Typography>
-
-                            {candidate.note && (
-                              <Typography>
-                                <strong>メモ：</strong>
-                                {candidate.note}
-                              </Typography>
-                            )}
-                          </Stack>
-
-                          {candidate.facility && (
-                            <Stack
-                              direction={{
-                                xs: "column",
-                                sm: "row",
+                          {/* 施設情報 */}
+                          <Box
+                            sx={{
+                              display: "grid",
+                              gridTemplateColumns: {
+                                xs: "1fr",
+                                md: "repeat(2, minmax(0, 1fr))",
+                              },
+                              gap: 2,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius: 3,
+                                bgcolor: "background.default",
                               }}
-                              spacing={1}
                             >
-                              <Button
-                                variant="outlined"
-                                onClick={() => {
-                                  navigate(
-                                    `/facilities/${candidate.facility!.facilityId}`,
-                                  );
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                🏠 住所
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  mt: 0.5,
+                                  fontWeight: 600,
                                 }}
                               >
-                                施設詳細を見る
-                              </Button>
+                                {candidate.facility?.address ?? "未設定"}
+                              </Typography>
+                            </Box>
 
-                              {candidate.activeInquiryId ? (
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius: 3,
+                                bgcolor: "background.default",
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                ☎️ 電話番号
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  mt: 0.5,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {candidate.facility?.phone ?? "未設定"}
+                              </Typography>
+                            </Box>
+                          </Box>
+
+                          {/* 候補施設メモ */}
+                          {candidate.note && (
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius: 3,
+                                bgcolor: "secondary.light",
+                              }}
+                            >
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                📝 メモ
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  mt: 0.5,
+                                  whiteSpace: "pre-wrap",
+                                }}
+                              >
+                                {candidate.note}
+                              </Typography>
+                            </Box>
+                          )}
+
+                          {/* アクション */}
+                          {candidate.facility && (
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: {
+                                  xs: "stretch",
+                                  sm: "flex-end",
+                                },
+                              }}
+                            >
+                              <Stack
+                                direction={{
+                                  xs: "column",
+                                  sm: "row",
+                                }}
+                                spacing={1}
+                                sx={{
+                                  width: {
+                                    xs: "100%",
+                                    sm: "auto",
+                                  },
+                                }}
+                              >
                                 <Button
-                                  variant="contained"
+                                  variant="outlined"
                                   onClick={() => {
                                     navigate(
-                                      `/inquiries/${candidate.activeInquiryId}`,
+                                      `/facilities/${candidate.facility!.facilityId}`,
                                     );
                                   }}
                                 >
-                                  問い合わせを見る
+                                  施設詳細を見る
                                 </Button>
-                              ) : (
-                                <Button
-                                  variant="contained"
-                                  onClick={() => {
-                                    const searchParams = new URLSearchParams({
-                                      placementCaseId,
-                                      candidateFacilityId:
-                                        candidate.candidateFacilityId,
-                                    });
 
-                                    navigate(
-                                      `/facilities/${candidate.facility!.facilityId}/inquiry?${searchParams.toString()}`,
-                                    );
-                                  }}
-                                >
-                                  この施設に問い合わせる
-                                </Button>
-                              )}
-                            </Stack>
+                                {candidate.activeInquiryId ? (
+                                  <Button
+                                    variant="contained"
+                                    onClick={() => {
+                                      navigate(
+                                        `/inquiries/${candidate.activeInquiryId}`,
+                                      );
+                                    }}
+                                  >
+                                    💬 問い合わせを見る
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="contained"
+                                    onClick={() => {
+                                      const searchParams = new URLSearchParams({
+                                        placementCaseId,
+                                        candidateFacilityId:
+                                          candidate.candidateFacilityId,
+                                      });
+
+                                      navigate(
+                                        `/facilities/${candidate.facility!.facilityId}/inquiry?${searchParams.toString()}`,
+                                      );
+                                    }}
+                                  >
+                                    💬 この施設に問い合わせる
+                                  </Button>
+                                )}
+                              </Stack>
+                            </Box>
                           )}
                         </Stack>
                       </CardContent>
