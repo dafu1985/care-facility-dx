@@ -183,23 +183,83 @@ export function FacilitySearchPage() {
         {/* ヘッダー */}
         <Box>
           <Button
-            onClick={() => {
-              navigate("/");
-            }}
+            onClick={() => navigate("/")}
             sx={{
               mb: 2,
+              color: "text.secondary",
+              fontWeight: 600,
             }}
           >
             ← ホームへ戻る
           </Button>
 
-          <Typography variant="h4" component="h1" gutterBottom>
-            介護施設検索
-          </Typography>
+          <Box
+            sx={{
+              p: { xs: 3, sm: 4 },
+              borderRadius: 4,
+              background:
+                "linear-gradient(135deg, #EEF2FF 0%, #FFF1EC 55%, #E8F7F5 100%)",
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography
+              variant="overline"
+              sx={{
+                color: "primary.main",
+                fontWeight: 800,
+                letterSpacing: 1.5,
+              }}
+            >
+              FACILITY SEARCH
+            </Typography>
 
-          <Typography color="text.secondary">
-            利用者様の条件に合う施設を検索します。
-          </Typography>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={{
+                mt: 1,
+                alignItems: {
+                  xs: "flex-start",
+                  sm: "center",
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 3,
+                  bgcolor: "white",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 30,
+                  boxShadow: "0 4px 16px rgba(99, 102, 241, 0.08)",
+                }}
+              >
+                🏡
+              </Box>
+
+              <Box>
+                <Typography
+                  variant="h4"
+                  component="h1"
+                  sx={{
+                    fontWeight: 800,
+                    mb: 0.5,
+                    fontSize: { xs: "1.6rem", sm: "2rem" },
+                  }}
+                >
+                  介護施設検索
+                </Typography>
+
+                <Typography color="text.secondary">
+                  利用者様の希望や必要なケアに合わせて、最適な施設を探しましょう。
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
         </Box>
 
         {/* 検索条件 */}
@@ -209,7 +269,22 @@ export function FacilitySearchPage() {
               検索条件
             </Typography>
 
-            <Stack spacing={2}>
+            <Stack
+              spacing={2}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(2, minmax(0, 1fr))",
+                },
+                columnGap: 2,
+                rowGap: 2,
+                "& > *": {
+                  minWidth: 0,
+                  margin: "0 !important",
+                },
+              }}
+            >
               {/* エリア */}
               <TextField
                 label="エリア"
@@ -273,7 +348,12 @@ export function FacilitySearchPage() {
               </TextField>
 
               {/* 受入条件 */}
-              <Box>
+              <Box
+                sx={{
+                  gridColumn: "1 / -1",
+                  mt: 1,
+                }}
+              >
                 <Typography
                   variant="subtitle1"
                   sx={{
@@ -283,7 +363,16 @@ export function FacilitySearchPage() {
                   必要な対応
                 </Typography>
 
-                <Stack>
+                <Stack
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "repeat(2, minmax(0, 1fr))",
+                    },
+                    gap: 1.5,
+                  }}
+                >
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -294,6 +383,23 @@ export function FacilitySearchPage() {
                       />
                     }
                     label="認知症対応"
+                    sx={{
+                      m: 0,
+                      px: 1.5,
+                      py: 0.5,
+                      border: "1px solid",
+                      borderColor: dementiaAccepted
+                        ? "primary.main"
+                        : "divider",
+                      borderRadius: 2,
+                      bgcolor: dementiaAccepted
+                        ? "#F5F3FF"
+                        : "background.paper",
+                      transition: "background-color 0.2s, border-color 0.2s",
+                      "& .MuiFormControlLabel-label": {
+                        fontWeight: dementiaAccepted ? 700 : 500,
+                      },
+                    }}
                   />
 
                   <FormControlLabel
@@ -306,6 +412,23 @@ export function FacilitySearchPage() {
                       />
                     }
                     label="医療ケア対応"
+                    sx={{
+                      m: 0,
+                      px: 1.5,
+                      py: 0.5,
+                      border: "1px solid",
+                      borderColor: medicalCareAccepted
+                        ? "primary.main"
+                        : "divider",
+                      borderRadius: 2,
+                      bgcolor: medicalCareAccepted
+                        ? "#F5F3FF"
+                        : "background.paper",
+                      transition: "background-color 0.2s, border-color 0.2s",
+                      "& .MuiFormControlLabel-label": {
+                        fontWeight: medicalCareAccepted ? 700 : 500,
+                      },
+                    }}
                   />
 
                   <FormControlLabel
@@ -318,6 +441,23 @@ export function FacilitySearchPage() {
                       />
                     }
                     label="車椅子対応"
+                    sx={{
+                      m: 0,
+                      px: 1.5,
+                      py: 0.5,
+                      border: "1px solid",
+                      borderColor: wheelchairAccepted
+                        ? "primary.main"
+                        : "divider",
+                      borderRadius: 2,
+                      bgcolor: wheelchairAccepted
+                        ? "#F5F3FF"
+                        : "background.paper",
+                      transition: "background-color 0.2s, border-color 0.2s",
+                      "& .MuiFormControlLabel-label": {
+                        fontWeight: wheelchairAccepted ? 700 : 500,
+                      },
+                    }}
                   />
 
                   <FormControlLabel
@@ -330,6 +470,19 @@ export function FacilitySearchPage() {
                       />
                     }
                     label="看取り対応"
+                    sx={{
+                      m: 0,
+                      px: 1.5,
+                      py: 0.5,
+                      border: "1px solid",
+                      borderColor: endOfLifeCare ? "primary.main" : "divider",
+                      borderRadius: 2,
+                      bgcolor: endOfLifeCare ? "#F5F3FF" : "background.paper",
+                      transition: "background-color 0.2s, border-color 0.2s",
+                      "& .MuiFormControlLabel-label": {
+                        fontWeight: endOfLifeCare ? 700 : 500,
+                      },
+                    }}
                   />
                 </Stack>
               </Box>
@@ -341,6 +494,12 @@ export function FacilitySearchPage() {
                   sm: "row",
                 }}
                 spacing={2}
+                sx={{
+                  gridColumn: "1 / -1",
+                  pt: 2,
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                }}
               >
                 <Button
                   variant="contained"
@@ -349,8 +508,18 @@ export function FacilitySearchPage() {
                   }}
                   disabled={isLoading}
                   fullWidth
+                  sx={{
+                    minHeight: 48,
+                    borderRadius: 2.5,
+                    fontWeight: 700,
+                    fontSize: "1rem",
+                    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+                    "&:hover": {
+                      boxShadow: "0 6px 16px rgba(99, 102, 241, 0.3)",
+                    },
+                  }}
                 >
-                  検索
+                  🔍 施設を検索する
                 </Button>
 
                 <Button
@@ -358,8 +527,22 @@ export function FacilitySearchPage() {
                   onClick={handleClear}
                   disabled={isLoading}
                   fullWidth
+                  sx={{
+                    minHeight: 48,
+                    borderRadius: 2.5,
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    borderColor: "divider",
+                    color: "text.secondary",
+                    bgcolor: "background.paper",
+                    "&:hover": {
+                      borderColor: "primary.main",
+                      color: "primary.main",
+                      bgcolor: "#F5F3FF",
+                    },
+                  }}
                 >
-                  条件をクリア
+                  ↺ 条件をクリア
                 </Button>
               </Stack>
             </Stack>
@@ -386,15 +569,67 @@ export function FacilitySearchPage() {
           <Stack spacing={2}>
             <Typography variant="h5">検索結果</Typography>
 
-            <Typography color="text.secondary">
-              {result.total}件見つかりました
-            </Typography>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              sx={{
+                justifyContent: "space-between",
+                alignItems: {
+                  xs: "flex-start",
+                  sm: "center",
+                },
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="h5"
+                  component="h2"
+                  sx={{
+                    fontWeight: 800,
+                    mb: 0.5,
+                  }}
+                >
+                  🏡 検索結果
+                </Typography>
+
+                <Typography variant="body2" color="text.secondary">
+                  条件に一致する介護施設の一覧です。
+                </Typography>
+              </Box>
+
+              <Chip
+                label={`${result.total}件の施設が見つかりました`}
+                color="primary"
+                variant="outlined"
+                sx={{
+                  fontWeight: 700,
+                  borderRadius: 2,
+                  height: 34,
+                  bgcolor: "#EEF2FF",
+                }}
+              />
+            </Stack>
 
             {result.items.length === 0 ? (
               <Alert severity="info">条件に一致する施設はありません。</Alert>
             ) : (
               result.items.map((facility) => (
-                <Card key={facility.facilityId} variant="outlined">
+                <Card
+                  key={facility.facilityId}
+                  variant="outlined"
+                  sx={{
+                    borderRadius: 3,
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
+                    overflow: "hidden",
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 8px 24px rgba(99, 102, 241, 0.10)",
+                      borderColor: "primary.light",
+                    },
+                  }}
+                >
                   <CardActionArea
                     onClick={() => {
                       navigate(`/facilities/${facility.facilityId}`);
@@ -409,18 +644,28 @@ export function FacilitySearchPage() {
                             gap: 2,
                           }}
                         >
-                          <Box>
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
                             <Typography
                               variant="h6"
                               component="h2"
                               sx={{
-                                fontWeight: 700,
+                                fontWeight: 800,
+                                fontSize: { xs: "1.05rem", sm: "1.2rem" },
+                                lineHeight: 1.5,
+                                overflowWrap: "anywhere",
+                                mb: 0.75,
                               }}
                             >
-                              {facility.name}
+                              🏡 {facility.name}
                             </Typography>
 
-                            <Typography color="text.secondary">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "text.secondary",
+                                fontWeight: 500,
+                              }}
+                            >
                               {facility.facilityType?.name ?? "施設種別未登録"}
                             </Typography>
                           </Box>
@@ -431,28 +676,135 @@ export function FacilitySearchPage() {
                                 facility.availability.status,
                               )}
                               size="small"
+                              color={
+                                facility.availability.status === "AVAILABLE"
+                                  ? "success"
+                                  : facility.availability.status === "FEW"
+                                    ? "warning"
+                                    : "default"
+                              }
+                              variant={
+                                facility.availability.status === "FULL"
+                                  ? "outlined"
+                                  : "filled"
+                              }
+                              sx={{
+                                fontWeight: 700,
+                                borderRadius: 2,
+                                px: 0.5,
+                                flexShrink: 0,
+                              }}
                             />
                           )}
                         </Box>
 
-                        <Typography>
-                          {facility.address ?? facility.area}
-                        </Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          sx={{
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <Typography
+                            component="span"
+                            sx={{
+                              fontSize: "1rem",
+                              lineHeight: 1.6,
+                              flexShrink: 0,
+                            }}
+                          >
+                            📍
+                          </Typography>
+
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "text.secondary",
+                              lineHeight: 1.8,
+                              overflowWrap: "anywhere",
+                            }}
+                          >
+                            {facility.address ?? facility.area}
+                          </Typography>
+                        </Stack>
 
                         {facility.pricing && (
-                          <Typography>
-                            月額：
-                            {facility.pricing.monthlyCostMin.toLocaleString()}円
-                            〜{" "}
-                            {facility.pricing.monthlyCostMax.toLocaleString()}円
-                          </Typography>
+                          <Box
+                            sx={{
+                              bgcolor: "#F7F8FC",
+                              borderRadius: 2,
+                              px: 2,
+                              py: 1.5,
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "text.secondary",
+                                fontWeight: 600,
+                                display: "block",
+                                mb: 0.5,
+                              }}
+                            >
+                              💰 月額利用料金
+                            </Typography>
+
+                            <Typography
+                              sx={{
+                                color: "primary.main",
+                                fontWeight: 800,
+                                fontSize: { xs: "1rem", sm: "1.15rem" },
+                                overflowWrap: "anywhere",
+                              }}
+                            >
+                              {facility.pricing.monthlyCostMin.toLocaleString()}
+                              円{" 〜 "}
+                              {facility.pricing.monthlyCostMax.toLocaleString()}
+                              円
+                            </Typography>
+                          </Box>
                         )}
 
                         {facility.availability && (
-                          <Typography>
-                            空き数：
-                            {facility.availability.availableCount ?? "-"}床
-                          </Typography>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            sx={{
+                              alignItems: "center",
+                              px: 1.5,
+                              py: 1,
+                              bgcolor: "#F0FDF9",
+                              borderRadius: 2,
+                              width: "fit-content",
+                              maxWidth: "100%",
+                            }}
+                          >
+                            <Typography sx={{ fontSize: "1rem" }}>
+                              🛏️
+                            </Typography>
+
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: "text.secondary",
+                                fontWeight: 600,
+                              }}
+                            >
+                              空き数
+                            </Typography>
+
+                            <Typography
+                              sx={{
+                                color: "success.dark",
+                                fontWeight: 800,
+                                fontSize: "1rem",
+                              }}
+                            >
+                              {facility.availability.availableCount == null
+                                ? "未確認"
+                                : `${facility.availability.availableCount}床`}
+                            </Typography>
+                          </Stack>
                         )}
 
                         {facility.requirement && (
@@ -465,19 +817,71 @@ export function FacilitySearchPage() {
                             }}
                           >
                             {facility.requirement.dementiaAccepted && (
-                              <Chip label="認知症" size="small" />
+                              <Chip
+                                label="🧠 認知症対応"
+                                size="small"
+                                sx={{
+                                  bgcolor: "#EEF2FF",
+                                  color: "#4F46E5",
+                                  fontWeight: 700,
+                                  borderRadius: 2,
+                                  height: 30,
+                                  "& .MuiChip-label": {
+                                    px: 1.5,
+                                  },
+                                }}
+                              />
                             )}
 
                             {facility.requirement.medicalCareAccepted && (
-                              <Chip label="医療ケア" size="small" />
+                              <Chip
+                                label="🩺 医療ケア対応"
+                                size="small"
+                                sx={{
+                                  bgcolor: "#E8F7F5",
+                                  color: "#00897B",
+                                  fontWeight: 700,
+                                  borderRadius: 2,
+                                  height: 30,
+                                  "& .MuiChip-label": {
+                                    px: 1.5,
+                                  },
+                                }}
+                              />
                             )}
 
                             {facility.requirement.wheelchairAccepted && (
-                              <Chip label="車椅子" size="small" />
+                              <Chip
+                                label="♿ 車椅子対応"
+                                size="small"
+                                sx={{
+                                  bgcolor: "#FFF1EC",
+                                  color: "#E76F51",
+                                  fontWeight: 700,
+                                  borderRadius: 2,
+                                  height: 30,
+                                  "& .MuiChip-label": {
+                                    px: 1.5,
+                                  },
+                                }}
+                              />
                             )}
 
                             {facility.requirement.endOfLifeCare && (
-                              <Chip label="看取り" size="small" />
+                              <Chip
+                                label="🌸 看取り対応"
+                                size="small"
+                                sx={{
+                                  bgcolor: "#FCE7F3",
+                                  color: "#BE185D",
+                                  fontWeight: 700,
+                                  borderRadius: 2,
+                                  height: 30,
+                                  "& .MuiChip-label": {
+                                    px: 1.5,
+                                  },
+                                }}
+                              />
                             )}
                           </Stack>
                         )}
