@@ -247,24 +247,101 @@ export function InquiryCreatePage() {
         </Box>
 
         {/* 問い合わせ先 */}
-        <Card>
-          <CardContent>
-            <Typography variant="h5" component="h1" gutterBottom>
-              施設への問い合わせ
-            </Typography>
+        <Card
+          sx={{
+            borderRadius: 4,
+            background:
+              "linear-gradient(135deg, #EEF2FF 0%, #FFF1EC 55%, #E8F7F5 100%)",
+            border: "1px solid",
+            borderColor: "divider",
+            boxShadow: "none",
+            overflow: "hidden",
+          }}
+        >
+          <CardContent
+            sx={{
+              p: { xs: 3, sm: 4 },
+              "&:last-child": {
+                pb: { xs: 3, sm: 4 },
+              },
+            }}
+          >
+            <Stack spacing={2.5}>
+              {/* ページタイトル */}
+              <Box>
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: "primary.main",
+                    fontWeight: 800,
+                    letterSpacing: 1.5,
+                  }}
+                >
+                  FACILITY INQUIRY
+                </Typography>
 
-            <Typography
-              variant="h6"
-              sx={{
-                mt: 2,
-              }}
-            >
-              {facility.name}
-            </Typography>
+                <Typography
+                  variant="h4"
+                  component="h1"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: { xs: "1.5rem", sm: "2rem" },
+                    mt: 0.5,
+                  }}
+                >
+                  ✉️ 施設への問い合わせ
+                </Typography>
 
-            <Typography color="text.secondary">
-              {facility.address ?? facility.area}
-            </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1, lineHeight: 1.8 }}
+                >
+                  施設の空き状況や受入条件についてお問い合わせいただけます。
+                </Typography>
+              </Box>
+
+              {/* 問い合わせ先施設 */}
+              <Box
+                sx={{
+                  p: { xs: 2, sm: 2.5 },
+                  bgcolor: "rgba(255, 255, 255, 0.75)",
+                  borderRadius: 2.5,
+                }}
+              >
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "text.secondary",
+                    fontWeight: 700,
+                  }}
+                >
+                  🏡 お問い合わせ先
+                </Typography>
+
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 800,
+                    mt: 1,
+                    mb: 0.5,
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  {facility.name}
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
+                    overflowWrap: "anywhere",
+                  }}
+                >
+                  📍 {facility.address ?? facility.area}
+                </Typography>
+              </Box>
+            </Stack>
 
             {placementCaseId && candidateFacilityId && (
               <Alert
@@ -280,10 +357,44 @@ export function InquiryCreatePage() {
         </Card>
 
         {/* 入力フォーム */}
-        <Card>
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography variant="h6">問い合わせ内容</Typography>
+        <Card
+          variant="outlined"
+          sx={{
+            borderRadius: 3,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            boxShadow: "0 4px 16px rgba(99, 102, 241, 0.04)",
+          }}
+        >
+          <CardContent
+            sx={{
+              p: { xs: 2.5, sm: 3 },
+              "&:last-child": {
+                pb: { xs: 2.5, sm: 3 },
+              },
+            }}
+          >
+            <Stack spacing={2.5}>
+              <Box>
+                <Typography
+                  variant="h6"
+                  component="h2"
+                  sx={{
+                    fontWeight: 800,
+                    mb: 0.5,
+                  }}
+                >
+                  📝 お問い合わせ内容
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ lineHeight: 1.8 }}
+                >
+                  件名とお問い合わせ内容を入力してください。
+                </Typography>
+              </Box>
 
               {error && <Alert severity="error">{error}</Alert>}
 
@@ -293,6 +404,7 @@ export function InquiryCreatePage() {
                 onChange={(event) => {
                   setSubject(event.target.value);
                 }}
+                placeholder="例：入居受け入れについてのご相談"
                 slotProps={{
                   htmlInput: {
                     maxLength: 255,
@@ -301,19 +413,47 @@ export function InquiryCreatePage() {
                 helperText={`${subject.length}/255文字`}
                 required
                 fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2.5,
+                    bgcolor: "#F8FAFC",
+                    "&.Mui-focused": {
+                      bgcolor: "background.paper",
+                    },
+                  },
+                  "& .MuiFormHelperText-root": {
+                    textAlign: "right",
+                    mx: 0.5,
+                  },
+                }}
               />
-
               <TextField
                 label="問い合わせ内容"
                 value={body}
                 onChange={(event) => {
                   setBody(event.target.value);
                 }}
-                placeholder="例：要介護3の利用者について、現在受け入れ可能でしょうか。"
+                placeholder={
+                  "例：要介護3の利用者について、現在受け入れ可能でしょうか。\n" +
+                  "受け入れ可能な場合、入居時期や必要な手続きについても教えてください。"
+                }
                 multiline
                 minRows={6}
                 required
                 fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: 2.5,
+                    bgcolor: "#F8FAFC",
+                    alignItems: "flex-start",
+                    "&.Mui-focused": {
+                      bgcolor: "background.paper",
+                    },
+                  },
+                  "& .MuiInputBase-inputMultiline": {
+                    lineHeight: 1.9,
+                  },
+                }}
               />
 
               <Button
@@ -325,8 +465,24 @@ export function InquiryCreatePage() {
                 disabled={
                   isSubmitting || subject.trim() === "" || body.trim() === ""
                 }
+                sx={{
+                  bgcolor: "#6366F1",
+                  borderRadius: 2.5,
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 800,
+                  textTransform: "none",
+                  alignSelf: { xs: "stretch", sm: "flex-end" },
+                  boxShadow: "0 6px 18px rgba(99, 102, 241, 0.2)",
+                  "&:hover": {
+                    bgcolor: "#4F46E5",
+                  },
+                  "&.Mui-disabled": {
+                    boxShadow: "none",
+                  },
+                }}
               >
-                {isSubmitting ? "送信中..." : "問い合わせを送信"}
+                {isSubmitting ? "送信中..." : "✉️ 問い合わせを送信"}
               </Button>
             </Stack>
           </CardContent>
