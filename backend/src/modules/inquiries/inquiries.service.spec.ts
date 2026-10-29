@@ -1138,7 +1138,7 @@ describe('InquiriesService authorization', () => {
           inquiryId: inquiryBeforeUpdate.inquiryId,
           senderUserId: null,
           type: InquiryMessageType.STATUS_CHANGE,
-          body: 'Status changed from OPEN to IN_PROGRESS',
+          body: '対応状況を「未対応」から「対応中」に変更しました。',
         });
       });
 
@@ -1334,7 +1334,7 @@ describe('InquiriesService authorization', () => {
         inquiryId: inquiryBeforeUpdate.inquiryId,
         senderUserId: null,
         type: InquiryMessageType.STATUS_CHANGE,
-        body: 'Status changed from ANSWERED to CLOSED',
+        body: '対応状況を「回答済み」から「完了」に変更しました。',
       });
     });
 

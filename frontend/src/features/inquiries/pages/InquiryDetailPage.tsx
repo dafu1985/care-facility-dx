@@ -65,6 +65,29 @@ function isSystemMessage(message: InquiryMessage): boolean {
 }
 
 /**
+ * 過去に保存された英語のステータス変更履歴を日本語表示する。
+ * DBに保存されたメッセージ本文は変更しない。
+ */
+function getSystemMessageBody(message: InquiryMessage): string {
+  if (message.type !== "STATUS_CHANGE") {
+    return message.body;
+  }
+
+  const match = message.body.match(
+    /^Status changed from (OPEN|IN_PROGRESS|ANSWERED|CLOSED|CANCELLED) to (OPEN|IN_PROGRESS|ANSWERED|CLOSED|CANCELLED)$/,
+  );
+
+  if (!match) {
+    return message.body;
+  }
+
+  const previousStatus = match[1] as InquiryStatus;
+  const nextStatus = match[2] as InquiryStatus;
+
+  return `対応状況を「${getStatusLabel(previousStatus)}」から「${getStatusLabel(nextStatus)}」に変更しました。`;
+}
+
+/**
  * 問い合わせ詳細画面。
  */
 export function InquiryDetailPage() {
@@ -617,7 +640,7 @@ export function InquiryDetailPage() {
                                 overflowWrap: "anywhere",
                               }}
                             >
-                              ⚙️ {message.body}
+                              ⚙️ {getSystemMessageBody(message)}
                             </Typography>
 
                             <Typography
