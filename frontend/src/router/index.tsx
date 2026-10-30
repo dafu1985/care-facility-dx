@@ -10,7 +10,7 @@ import { FacilityDetailPage } from "../features/facilities/pages/FacilityDetailP
 import { FacilitySearchPage } from "../features/facilities/pages/FacilitySearchPage";
 
 import { InquiryCreatePage } from "../features/inquiries/pages/InquiryCreatePage";
-import { InquiryDetailPage } from "../features/inquiries/pages/InquiryDetailPage";
+import { InquiryDetailRoute } from "../features/inquiries/components/InquiryDetailRoute";
 import { InquiryListPage } from "../features/inquiries/pages/InquiryListPage";
 
 import { ClientConditionEditPage } from "../features/placement-cases/pages/ClientConditionEditPage";
@@ -18,6 +18,8 @@ import { MedicalRequirementsEditPage } from "../features/placement-cases/pages/M
 import { PlacementCaseCreatePage } from "../features/placement-cases/pages/PlacementCaseCreatePage";
 import { PlacementCaseDetailPage } from "../features/placement-cases/pages/PlacementCaseDetailPage";
 import { PlacementCaseListPage } from "../features/placement-cases/pages/PlacementCaseListPage";
+import { RequireAdmin } from "../features/admin/components/RequireAdmin";
+import { AdminFacilitiesPage } from "../features/admin/pages/AdminFacilitiesPage";
 
 /**
  * アプリケーション全体のルーティング設定。
@@ -54,7 +56,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/inquiries/:inquiryId",
-        element: <InquiryDetailPage />,
+        element: <InquiryDetailRoute />,
       },
       {
         path: "/facilities",
@@ -87,6 +89,14 @@ export const router = createBrowserRouter([
       {
         path: "/placement-cases/:placementCaseId",
         element: <PlacementCaseDetailPage />,
+      },
+      {
+        path: "/admin/facilities",
+        element: (
+          <RequireAdmin>
+            <AdminFacilitiesPage />
+          </RequireAdmin>
+        ),
       },
     ],
   },

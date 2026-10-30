@@ -56,8 +56,6 @@ export function MedicalRequirementsEditPage() {
    */
   useEffect(() => {
     if (!placementCaseId) {
-      setError("案件IDを取得できませんでした。");
-      setIsLoading(false);
       return;
     }
 
@@ -173,6 +171,29 @@ export function MedicalRequirementsEditPage() {
     }
   }
 
+  /**
+   * 案件IDが取得できなかった場合。
+   */
+  if (!placementCaseId) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Stack spacing={2}>
+          <Alert severity="error">案件IDを取得できませんでした。</Alert>
+
+          <Button
+            variant="outlined"
+            onClick={() => navigate("/placement-cases")}
+          >
+            案件一覧へ戻る
+          </Button>
+        </Stack>
+      </Container>
+    );
+  }
+
+  /**
+   * 医療条件の読み込み中。
+   */
   if (isLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>

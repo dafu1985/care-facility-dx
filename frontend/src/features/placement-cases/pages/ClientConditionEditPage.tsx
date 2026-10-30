@@ -47,8 +47,6 @@ export function ClientConditionEditPage() {
    */
   useEffect(() => {
     if (!placementCaseId) {
-      setError("案件IDを取得できませんでした。");
-      setIsLoading(false);
       return;
     }
 
