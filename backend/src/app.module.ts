@@ -13,6 +13,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { CareManagerOfficesModule } from './modules/care-managers/care-manager-offices.module';
 import { PlacementCasesModule } from './modules/placement-cases/placement-cases.module';
 import { MedicalConditionsModule } from './modules/medical-conditions/medical-conditions.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { MedicalConditionsModule } from './modules/medical-conditions/medical-co
     CareManagerOfficesModule,
     PlacementCasesModule,
     MedicalConditionsModule,
+    AdminModule,
   ],
 
   controllers: [AppController],

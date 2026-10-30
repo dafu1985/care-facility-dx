@@ -32,7 +32,7 @@ import {
   FacilityStaff,
   FacilityStaffStatus,
 } from './entities/facility-staff.entity';
-import { Facility } from './entities/facility.entity';
+import { Facility, FacilityStatus } from './entities/facility.entity';
 
 import { FacilityMapper } from './facility.mapper';
 
@@ -224,7 +224,10 @@ export class FacilitiesService {
       .leftJoinAndSelect('facility.facilityType', 'facilityType')
       .leftJoinAndSelect('facility.availability', 'availability')
       .leftJoinAndSelect('facility.pricing', 'pricing')
-      .leftJoinAndSelect('facility.requirement', 'requirement');
+      .leftJoinAndSelect('facility.requirement', 'requirement')
+      .where('facility.status = :status', {
+        status: FacilityStatus.ACTIVE,
+      });
 
     // エリア
     if (query.area) {
@@ -363,6 +366,25 @@ export class FacilitiesService {
     }
 
     return FacilityMapper.toResponse(facility);
+  }
+
+  /**
+   * 公開用施設詳細を取得する。
+   * ACTIVEの施設のみ公開する。
+   */
+  async findOnePublic(facilityId: string): Promise<FacilityResponseDto> {
+    const facility = await this.facilityRepository.findOne({
+      where: {
+        facilityId,
+        status: FacilityStatus.ACTIVE,
+      },
+    });
+
+    if (!facility) {
+      throw new NotFoundException('Facility not found');
+    }
+
+    return this.findOne(facilityId);
   }
 
   /**

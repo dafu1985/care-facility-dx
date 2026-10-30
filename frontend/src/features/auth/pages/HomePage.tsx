@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getMe } from "../api/get-me";
 import type { AuthMeResponse } from "../types/auth";
 
+import { AdminDashboardPage } from "../../admin/pages/AdminDashboardPage";
 import { CareManagerDashboardPage } from "../../care-managers/pages/CareManagerDashboardPage";
 import { FacilityDashboardPage } from "../../facilities/pages/FacilityDashboardPage";
 
@@ -12,14 +13,14 @@ import { FacilityDashboardPage } from "../../facilities/pages/FacilityDashboardP
  * ログインユーザー情報を取得し、
  * ユーザー権限に応じて表示画面を切り替える。
  *
+ * ADMIN:
+ * 管理者専用ダッシュボードを表示する。
+ *
  * FACILITY:
  * 所属施設のダッシュボードを表示する。
  *
  * CARE_MANAGER:
  * ケアマネジャー向けダッシュボードを表示する。
- *
- * ADMIN:
- * 現時点ではログインユーザー情報を表示する。
  */
 export function HomePage() {
   const [user, setUser] = useState<AuthMeResponse | null>(null);
@@ -43,7 +44,7 @@ export function HomePage() {
         setUser(response);
         setError(null);
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         if (cancelled) {
           return;
         }
@@ -87,7 +88,6 @@ export function HomePage() {
     return (
       <div>
         <h1>Care Facility DX</h1>
-
         <p>{error}</p>
       </div>
     );
@@ -100,10 +100,18 @@ export function HomePage() {
     return (
       <div>
         <h1>Care Facility DX</h1>
-
         <p>ユーザー情報を取得できませんでした。</p>
       </div>
     );
+  }
+
+  /**
+   * ADMINユーザー。
+   *
+   * 管理者専用ダッシュボードを表示する。
+   */
+  if (user.role === "ADMIN") {
+    return <AdminDashboardPage />;
   }
 
   /**
@@ -133,32 +141,18 @@ export function HomePage() {
     return (
       <div>
         <h1>Care Facility DX</h1>
-
         <p>所属施設情報を取得できませんでした。</p>
       </div>
     );
   }
 
   /**
-   * 現時点ではADMINなど、
-   * 専用画面が未実装のユーザー情報を表示する。
+   * 想定外のロールが返された場合。
    */
   return (
     <div>
       <h1>Care Facility DX</h1>
-
-      <h2>ログインユーザー</h2>
-
-      <dl>
-        <dt>メールアドレス</dt>
-        <dd>{user.email}</dd>
-
-        <dt>権限</dt>
-        <dd>{user.role}</dd>
-
-        <dt>施設ID</dt>
-        <dd>{user.facilityId ?? "所属施設なし"}</dd>
-      </dl>
+      <p>このアカウントに対応する画面がありません。</p>
     </div>
   );
 }

@@ -155,7 +155,7 @@ export class FacilitiesController {
     @Param('facilityId', new ParseUUIDPipe())
     facilityId: string,
   ): Promise<FacilityResponseDto> {
-    return this.facilitiesService.findOne(facilityId);
+    return this.facilitiesService.findOnePublic(facilityId);
   }
 
   /**
