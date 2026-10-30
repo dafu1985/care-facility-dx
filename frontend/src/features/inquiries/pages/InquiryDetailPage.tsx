@@ -7,12 +7,10 @@ import {
   Chip,
   CircularProgress,
   Container,
-  MenuItem,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { getMe } from "../../auth/api/get-me";
@@ -24,6 +22,8 @@ import { markInquiryRead } from "../api/mark-inquiry-read";
 import { updateInquiryStatus } from "../api/update-inquiry-status";
 import { InquiryStatusChip } from "../components/InquiryStatusChip";
 import { InquiryMessageList } from "../components/InquiryMessageList";
+import { InquiryMessageForm } from "../components/InquiryMessageForm";
+import { InquiryStatusForm } from "../components/InquiryStatusForm";
 
 import type { Inquiry, InquiryStatus } from "../types/inquiry";
 
@@ -60,41 +60,58 @@ export function InquiryDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * 取得した問い合わせを画面へ反映し、
-   * 実際に取得・表示した最後のメッセージまで既読にする。
+   * 問い合わせ再取得のリクエスト番号。
+   *
+   * 古いリクエストの結果が
+   * 新しい問い合わせ情報を上書きすることを防ぐ。
    */
-  const applyInquiry = async (response: Inquiry) => {
+  const refreshRequestIdRef = useRef(0);
+
+  /**
+   * 問い合わせデータを画面へ反映する。
+   *
+   * 既読更新は非同期で実行し、
+   * 画面表示や操作の完了を待たせない。
+   */
+  const applyInquiry = (response: Inquiry) => {
     setInquiry(response);
     setStatus(response.status);
 
     const lastMessage = response.messages.at(-1);
 
-    if (lastMessage) {
-      await markInquiryRead(response.inquiryId, lastMessage.messageId);
+    if (!lastMessage) {
+      return;
     }
+
+    void markInquiryRead(response.inquiryId, lastMessage.messageId).catch(
+      (error) => {
+        console.error("問い合わせの既読更新に失敗しました。", error);
+      },
+    );
   };
 
   /**
    * 問い合わせ詳細を再取得する。
+   *
+   * 最新のリクエスト結果のみ画面に反映する。
    */
   const refreshInquiry = async (targetInquiryId: string) => {
-    try {
-      const response = await getInquiry(targetInquiryId);
+    const requestId = ++refreshRequestIdRef.current;
 
-      await applyInquiry(response);
-      setError(null);
-    } catch (error) {
-      console.error("問い合わせ詳細の取得に失敗しました。", error);
+    const response = await getInquiry(targetInquiryId);
 
-      setError("問い合わせ詳細の取得に失敗しました。");
+    if (requestId !== refreshRequestIdRef.current) {
+      return;
     }
+
+    applyInquiry(response);
   };
 
   /**
    * 初回取得。
    *
-   * 問い合わせ詳細と
-   * ログインユーザー情報を取得する。
+   * 問い合わせ詳細とログインユーザー情報を取得する。
+   * 古いリクエストの結果が反映されないよう制御する。
    */
   useEffect(() => {
     if (!inquiryId) {
@@ -103,45 +120,51 @@ export function InquiryDetailPage() {
 
     let cancelled = false;
 
-    Promise.all([getInquiry(inquiryId), getMe()])
-      .then(async ([inquiryResponse, userResponse]) => {
-        if (cancelled) {
+    const requestId = ++refreshRequestIdRef.current;
+
+    const loadInquiry = async () => {
+      try {
+        const [inquiryResponse, userResponse] = await Promise.all([
+          getInquiry(inquiryId),
+          getMe(),
+        ]);
+
+        if (cancelled || requestId !== refreshRequestIdRef.current) {
           return;
         }
 
-        await applyInquiry(inquiryResponse);
-
+        applyInquiry(inquiryResponse);
         setCurrentUser(userResponse);
-
         setError(null);
-      })
-      .catch((error) => {
-        if (cancelled) {
+      } catch (error) {
+        if (cancelled || requestId !== refreshRequestIdRef.current) {
           return;
         }
 
-        console.error("問い合わせ詳細の取得に失敗しました。", error);
+        console.error("問い合わせ詳細の初期取得に失敗しました。", error);
 
         setError("問い合わせ詳細の取得に失敗しました。");
-      })
-      .finally(() => {
-        if (cancelled) {
-          return;
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
         }
+      }
+    };
 
-        setIsLoading(false);
-      });
+    void loadInquiry();
 
     return () => {
       cancelled = true;
+      refreshRequestIdRef.current += 1;
     };
   }, [inquiryId]);
 
   /**
    * 返信送信。
    */
+
   const handleSendMessage = async () => {
-    if (!inquiryId) {
+    if (!inquiryId || isSending || isUpdatingStatus) {
       return;
     }
 
@@ -149,25 +172,30 @@ export function InquiryDetailPage() {
 
     if (body === "") {
       setError("メッセージを入力してください。");
-
       return;
     }
 
+    setIsSending(true);
+    setError(null);
+
     try {
-      setIsSending(true);
-      setError(null);
-
-      await addInquiryMessage(inquiryId, {
-        body,
-      });
-
-      setMessageBody("");
-
-      await refreshInquiry(inquiryId);
+      await addInquiryMessage(inquiryId, { body });
     } catch (error) {
       console.error("メッセージ送信に失敗しました。", error);
-
       setError("メッセージ送信に失敗しました。");
+      setIsSending(false);
+      return;
+    }
+
+    setMessageBody("");
+
+    try {
+      await refreshInquiry(inquiryId);
+    } catch (error) {
+      console.error("送信後の再取得に失敗しました。", error);
+      setError(
+        "メッセージは送信されましたが、履歴の更新に失敗しました。画面を再読み込みしてください。",
+      );
     } finally {
       setIsSending(false);
     }
@@ -177,23 +205,35 @@ export function InquiryDetailPage() {
    * ステータス更新。
    */
   const handleUpdateStatus = async () => {
-    if (!inquiryId) {
+    if (!inquiryId || isUpdatingStatus || isSending || !inquiry) {
       return;
     }
 
+    if (status === inquiry.status) {
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    setError(null);
+
     try {
-      setIsUpdatingStatus(true);
-      setError(null);
-
-      await updateInquiryStatus(inquiryId, {
-        status,
-      });
-
-      await refreshInquiry(inquiryId);
+      await updateInquiryStatus(inquiryId, { status });
     } catch (error) {
       console.error("ステータス更新に失敗しました。", error);
-
       setError("ステータス更新に失敗しました。");
+      setIsUpdatingStatus(false);
+      return;
+    }
+
+    setInquiry((previous) => (previous ? { ...previous, status } : previous));
+
+    try {
+      await refreshInquiry(inquiryId);
+    } catch (error) {
+      console.error("更新後の再取得に失敗しました。", error);
+      setError(
+        "ステータスは更新されましたが、最新情報の取得に失敗しました。画面を再読み込みしてください。",
+      );
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -376,65 +416,18 @@ export function InquiryDetailPage() {
                   bgcolor: "#F8FAFC",
                 }}
               >
-                <Stack
-                  direction={{
-                    xs: "column",
-                    sm: "row",
-                  }}
-                  spacing={2}
-                  sx={{
-                    alignItems: {
-                      xs: "stretch",
-                      sm: "center",
-                    },
-                  }}
-                >
-                  <TextField
-                    select
-                    label="ステータス"
-                    value={status}
-                    onChange={(event) =>
-                      setStatus(event.target.value as InquiryStatus)
-                    }
-                    fullWidth
-                    size="small"
-                    sx={{
-                      bgcolor: "background.paper",
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: 2,
-                      },
-                    }}
-                  >
-                    <MenuItem value="OPEN">未対応</MenuItem>
-                    <MenuItem value="IN_PROGRESS">対応中</MenuItem>
-                    <MenuItem value="ANSWERED">回答済み</MenuItem>
-                    <MenuItem value="CLOSED">完了</MenuItem>
-                    <MenuItem value="CANCELLED">キャンセル</MenuItem>
-                  </TextField>
-
-                  <Button
-                    variant="contained"
-                    onClick={() => {
+                {currentUser !== null && (
+                  <InquiryStatusForm
+                    status={status}
+                    currentStatus={inquiry.status}
+                    role={currentUser.role}
+                    onStatusChange={setStatus}
+                    onUpdateStatus={() => {
                       void handleUpdateStatus();
                     }}
-                    disabled={isUpdatingStatus || status === inquiry.status}
-                    sx={{
-                      minWidth: { xs: "100%", sm: 160 },
-                      minHeight: 40,
-                      borderRadius: 2,
-                      fontWeight: 800,
-                      textTransform: "none",
-                      boxShadow: "none",
-                      bgcolor: "#6366F1",
-                      "&:hover": {
-                        bgcolor: "#4F46E5",
-                        boxShadow: "none",
-                      },
-                    }}
-                  >
-                    {isUpdatingStatus ? "更新中..." : "ステータス更新"}
-                  </Button>
-                </Stack>
+                    isUpdatingStatus={isUpdatingStatus || isSending}
+                  />
+                )}
               </Box>
             </CardContent>
           </Card>
@@ -549,55 +542,14 @@ export function InquiryDetailPage() {
                 </Typography>
               </Box>
 
-              <Stack spacing={2.5}>
-                <TextField
-                  label="メッセージ"
-                  value={messageBody}
-                  onChange={(event) => setMessageBody(event.target.value)}
-                  placeholder="返信内容を入力してください"
-                  multiline
-                  minRows={4}
-                  fullWidth
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: 2.5,
-                      bgcolor: "#F8FAFC",
-                      alignItems: "flex-start",
-                    },
-                  }}
-                />
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <Button
-                    variant="contained"
-                    onClick={() => {
-                      void handleSendMessage();
-                    }}
-                    disabled={isSending || messageBody.trim() === ""}
-                    sx={{
-                      minWidth: { xs: "100%", sm: 180 },
-                      minHeight: 44,
-                      borderRadius: 2.5,
-                      px: 3,
-                      fontWeight: 800,
-                      textTransform: "none",
-                      bgcolor: "#6366F1",
-                      boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
-                      "&:hover": {
-                        bgcolor: "#4F46E5",
-                        boxShadow: "0 6px 16px rgba(99, 102, 241, 0.2)",
-                      },
-                    }}
-                  >
-                    {isSending ? "送信中..." : "返信を送信"}
-                  </Button>
-                </Box>
-              </Stack>
+              <InquiryMessageForm
+                messageBody={messageBody}
+                onMessageBodyChange={setMessageBody}
+                onSendMessage={() => {
+                  void handleSendMessage();
+                }}
+                isSending={isSending || isUpdatingStatus}
+              />
             </CardContent>
           </Card>
         </Stack>
