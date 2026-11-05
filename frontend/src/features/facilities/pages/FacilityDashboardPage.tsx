@@ -19,6 +19,9 @@ import type { FacilityDashboardResponse } from "../types/facility";
 import { RequirementEditDialog } from "../components/RequirementEditDialog";
 import { FacilityEditDialog } from "../components/FacilityEditDialog";
 import { removeAccessToken } from "../../auth/utils/token-storage";
+import { MedicalCapabilitiesEditDialog } from "../components/MedicalCapabilitiesEditDialog";
+import { getFacilityMedicalCapabilities } from "../api/get-facility-medical-capabilities";
+import type { FacilityMedicalCapability } from "../types/facility-medical-capability";
 
 interface FacilityDashboardPageProps {
   facilityId: string;
@@ -74,6 +77,20 @@ export function FacilityDashboardPage({
 
   const [isFacilityDialogOpen, setIsFacilityDialogOpen] = useState(false);
 
+  const [isMedicalCapabilitiesDialogOpen, setIsMedicalCapabilitiesDialogOpen] =
+    useState(false);
+
+  const [medicalCapabilities, setMedicalCapabilities] = useState<
+    FacilityMedicalCapability[]
+  >([]);
+
+  const [isMedicalCapabilitiesLoading, setIsMedicalCapabilitiesLoading] =
+    useState(true);
+
+  const [medicalCapabilitiesError, setMedicalCapabilitiesError] = useState<
+    string | null
+  >(null);
+
   /**
    * 初回表示・facilityId変更時に
    * ダッシュボード情報を取得する。
@@ -116,6 +133,33 @@ export function FacilityDashboardPage({
     };
   }, [facilityId]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    getFacilityMedicalCapabilities(facilityId)
+      .then((response) => {
+        if (cancelled) return;
+
+        setMedicalCapabilities(response);
+        setMedicalCapabilitiesError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+
+        console.error("医療対応情報の取得に失敗しました。", error);
+        setMedicalCapabilitiesError("医療対応情報の取得に失敗しました。");
+      })
+      .finally(() => {
+        if (cancelled) return;
+
+        setIsMedicalCapabilitiesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [facilityId]);
+
   /**
    * 編集後などにダッシュボードを再取得する。
    */
@@ -129,6 +173,22 @@ export function FacilityDashboardPage({
       console.error("施設ダッシュボードの再取得に失敗しました。", error);
 
       setError("施設ダッシュボードの再取得に失敗しました。");
+    }
+  };
+
+  /**
+   * 医療対応情報を再取得する。
+   */
+  const refreshMedicalCapabilities = async () => {
+    try {
+      const response = await getFacilityMedicalCapabilities(facilityId);
+
+      setMedicalCapabilities(response);
+      setMedicalCapabilitiesError(null);
+    } catch (error) {
+      console.error("医療対応情報の再取得に失敗しました。", error);
+
+      setMedicalCapabilitiesError("医療対応情報の再取得に失敗しました。");
     }
   };
 
@@ -432,6 +492,100 @@ export function FacilityDashboardPage({
             </CardContent>
           </Card>
 
+          {/* 医療対応情報 */}
+          <Card>
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                <Typography variant="h6">医療対応情報</Typography>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setIsMedicalCapabilitiesDialogOpen(true)}
+                >
+                  編集
+                </Button>
+              </Box>
+
+              {isMedicalCapabilitiesLoading ? (
+                <CircularProgress size={24} />
+              ) : medicalCapabilitiesError ? (
+                <Alert severity="error">{medicalCapabilitiesError}</Alert>
+              ) : medicalCapabilities.length === 0 ? (
+                <Alert severity="info">
+                  医療対応情報はまだ登録されていません。
+                </Alert>
+              ) : (
+                <Stack spacing={2}>
+                  {medicalCapabilities.map((capability) => {
+                    const statusLabel =
+                      capability.status === "AVAILABLE"
+                        ? "対応可能"
+                        : capability.status === "CONSULTATION"
+                          ? "要相談"
+                          : "対応不可";
+
+                    return (
+                      <Box
+                        key={capability.medicalConditionId}
+                        sx={{
+                          p: 2,
+                          border: 1,
+                          borderColor: "divider",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 2,
+                          }}
+                        >
+                          <Typography sx={{ fontWeight: 700 }}>
+                            {capability.medicalCondition.name}
+                          </Typography>
+
+                          <Typography
+                            variant="body2"
+                            color={
+                              capability.status === "AVAILABLE"
+                                ? "success.main"
+                                : capability.status === "UNAVAILABLE"
+                                  ? "error.main"
+                                  : "warning.main"
+                            }
+                          >
+                            {statusLabel}
+                          </Typography>
+                        </Box>
+
+                        {capability.note && (
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{ mt: 1 }}
+                          >
+                            {capability.note}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+
           {/* 問い合わせ */}
           <Card>
             <CardContent>
@@ -574,6 +728,14 @@ export function FacilityDashboardPage({
         onClose={() => setIsFacilityDialogOpen(false)}
         onUpdated={() => {
           void refreshDashboard();
+        }}
+      />
+      <MedicalCapabilitiesEditDialog
+        open={isMedicalCapabilitiesDialogOpen}
+        facilityId={facilityId}
+        onClose={() => setIsMedicalCapabilitiesDialogOpen(false)}
+        onUpdated={() => {
+          void refreshMedicalCapabilities();
         }}
       />
     </>

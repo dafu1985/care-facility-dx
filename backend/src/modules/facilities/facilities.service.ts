@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, DataSource } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
@@ -73,6 +73,7 @@ export class FacilitiesService {
 
     @InjectRepository(MedicalConditionMaster)
     private readonly medicalConditionRepository: Repository<MedicalConditionMaster>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -854,6 +855,11 @@ export class FacilitiesService {
 
     const codes = dto.capabilities.map((capability) => capability.code);
 
+    // 同じ医療条件コードが複数指定されていないか確認する。
+    if (new Set(codes).size !== codes.length) {
+      throw new BadRequestException('同じ医療条件が複数指定されています。');
+    }
+
     // 有効な医療条件マスタのみ取得
     const masters = await this.medicalConditionRepository.find({
       where: {
@@ -869,22 +875,26 @@ export class FacilitiesService {
 
     const masterMap = new Map(masters.map((master) => [master.code, master]));
 
-    // 既存の施設医療対応能力を全削除
-    await this.facilityMedicalCapabilityRepository.delete({
-      facilityId,
+    // トランザクション内で医療対応情報を更新
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(FacilityMedicalCapability);
+
+      // 既存の施設医療対応情報を全削除
+      await repository.delete({ facilityId });
+
+      // 新しい医療対応情報を作成
+      const capabilities = dto.capabilities.map((item) =>
+        repository.create({
+          facilityId,
+          medicalConditionId: masterMap.get(item.code)!.medicalConditionId,
+          status: item.status,
+          note: item.note ?? null,
+        }),
+      );
+
+      // 新しい医療対応情報を保存
+      return repository.save(capabilities);
     });
-
-    // 新しい設定を作成
-    const capabilities = dto.capabilities.map((item) =>
-      this.facilityMedicalCapabilityRepository.create({
-        facilityId,
-        medicalConditionId: masterMap.get(item.code)!.medicalConditionId,
-        status: item.status,
-        note: item.note ?? null,
-      }),
-    );
-
-    return this.facilityMedicalCapabilityRepository.save(capabilities);
   }
 
   /**

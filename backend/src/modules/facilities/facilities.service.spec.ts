@@ -4,7 +4,12 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import type { FindManyOptions, FindOneOptions, Repository } from 'typeorm';
+import type {
+  FindManyOptions,
+  FindOneOptions,
+  Repository,
+  DataSource,
+} from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import { UserRole } from '../users/entities/user.entity';
@@ -30,6 +35,15 @@ import {
   InquiryMessage,
   InquiryMessageType,
 } from '../inquiries/entities/inquiry-message.entity';
+
+import {
+  FacilityMedicalCapability,
+  FacilityMedicalCapabilityStatus,
+} from './entities/facility-medical-capability.entity';
+import {
+  MedicalConditionCode,
+  MedicalConditionMaster,
+} from '../medical-conditions/entities/medical-condition-master.entity';
 
 describe('FacilitiesService updateAvailability', () => {
   let service: FacilitiesService;
@@ -132,6 +146,24 @@ describe('FacilitiesService updateAvailability', () => {
     createQueryBuilder: jest.fn<() => typeof inquiryQueryBuilder>(
       () => inquiryQueryBuilder,
     ),
+  };
+
+  const facilityMedicalCapabilityRepository = {
+    create:
+      jest.fn<
+        (input: Partial<FacilityMedicalCapability>) => FacilityMedicalCapability
+      >(),
+    delete: jest.fn(),
+    save: jest.fn<
+      (
+        capabilities: FacilityMedicalCapability[],
+      ) => Promise<FacilityMedicalCapability[]>
+    >(),
+    find: jest.fn(),
+  };
+
+  const medicalConditionRepository = {
+    find: jest.fn(),
   };
 
   /**
@@ -350,8 +382,29 @@ describe('FacilitiesService updateAvailability', () => {
       } as never,
     }) as unknown as InquiryMessage;
 
+  type TransactionManagerMock = {
+    getRepository: () => typeof facilityMedicalCapabilityRepository;
+  };
+
+  const dataSource = {
+    transaction:
+      jest.fn<
+        (
+          callback: (
+            manager: TransactionManagerMock,
+          ) => Promise<FacilityMedicalCapability[]>,
+        ) => Promise<FacilityMedicalCapability[]>
+      >(),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
+
+    dataSource.transaction.mockImplementation(async (callback) => {
+      return callback({
+        getRepository: () => facilityMedicalCapabilityRepository,
+      });
+    });
 
     /**
      * ダッシュボード問い合わせ関連のデフォルト。
@@ -374,19 +427,13 @@ describe('FacilitiesService updateAvailability', () => {
     const requirementRepo =
       facilityRequirementRepository as unknown as Repository<FacilityRequirement>;
 
-    /**
-     * FacilitiesServiceのconstructorは4引数。
-     */
     const pricingRepo =
       facilityPricingRepository as unknown as Repository<FacilityPricing>;
 
-    /**
-     * FacilitiesServiceのconstructorは5引数。
-     */
     const inquiryRepo = inquiryRepository as unknown as Repository<Inquiry>;
 
     /**
-     * FacilitiesServiceのconstructorは6引数。
+     * FacilitiesServiceのコンストラクタへRepositoryとDataSourceを渡す。
      */
     service = new FacilitiesService(
       facilityRepo,
@@ -395,6 +442,9 @@ describe('FacilitiesService updateAvailability', () => {
       requirementRepo,
       pricingRepo,
       inquiryRepo,
+      facilityMedicalCapabilityRepository as unknown as Repository<FacilityMedicalCapability>,
+      medicalConditionRepository as unknown as Repository<MedicalConditionMaster>,
+      dataSource as unknown as DataSource,
     );
   });
 
@@ -1919,6 +1969,317 @@ describe('FacilitiesService updateAvailability', () => {
 
         expect(inquiryQueryBuilder.take).toHaveBeenCalledWith(5);
       });
+    });
+  });
+  describe('replaceMedicalCapabilities', () => {
+    it('ADMINは任意施設の医療対応情報を更新できる', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      const master = {
+        medicalConditionId: 'medical-condition-insulin',
+        code: MedicalConditionCode.INSULIN,
+        name: 'インスリン',
+        displayOrder: 1,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as MedicalConditionMaster;
+
+      medicalConditionRepository.find.mockResolvedValue([master]);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+            note: '管理者による登録',
+          },
+        ],
+      };
+
+      const savedCapability = {
+        facilityId: facility.facilityId,
+        medicalConditionId: master.medicalConditionId,
+        status: FacilityMedicalCapabilityStatus.AVAILABLE,
+        note: '管理者による登録',
+      } as FacilityMedicalCapability;
+
+      facilityMedicalCapabilityRepository.create.mockReturnValue(
+        savedCapability,
+      );
+
+      facilityMedicalCapabilityRepository.save.mockResolvedValue([
+        savedCapability,
+      ]);
+
+      const result = await service.replaceMedicalCapabilities(
+        facility.facilityId,
+        dto,
+        adminUser,
+      );
+
+      // ADMINには施設所属の確認を要求しない
+      expect(facilityStaffRepository.findOne).not.toHaveBeenCalled();
+
+      // トランザクションで対象施設の情報を更新する
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+
+      expect(facilityMedicalCapabilityRepository.delete).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+      });
+
+      expect(facilityMedicalCapabilityRepository.create).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+        medicalConditionId: master.medicalConditionId,
+        status: FacilityMedicalCapabilityStatus.AVAILABLE,
+        note: '管理者による登録',
+      });
+
+      expect(facilityMedicalCapabilityRepository.save).toHaveBeenCalledWith([
+        savedCapability,
+      ]);
+
+      expect(result).toEqual([savedCapability]);
+    });
+
+    it('同じ医療条件コードが重複している場合は400になる', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+          },
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.CONSULTATION,
+          },
+        ],
+      };
+
+      await expect(
+        service.replaceMedicalCapabilities(facility.facilityId, dto, adminUser),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(medicalConditionRepository.find).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.delete).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.save).not.toHaveBeenCalled();
+    });
+    it('FACILITYは他施設の医療対応情報を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      // 対象施設へのACTIVE所属が存在しない
+      facilityStaffRepository.findOne.mockResolvedValue(null);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+          },
+        ],
+      };
+
+      await expect(
+        service.replaceMedicalCapabilities(
+          facility.facilityId,
+          dto,
+          facilityUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      // 権限がなければ医療条件の検索やデータ更新を実行しない
+      expect(medicalConditionRepository.find).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.delete).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.save).not.toHaveBeenCalled();
+    });
+    it('CARE_MANAGERは医療対応情報を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+          },
+        ],
+      };
+
+      await expect(
+        service.replaceMedicalCapabilities(
+          facility.facilityId,
+          dto,
+          careManagerUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(medicalConditionRepository.find).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.delete).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.save).not.toHaveBeenCalled();
+    });
+    it('FACILITYは自施設の医療対応情報を更新できる', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      facilityStaffRepository.findOne.mockResolvedValue(
+        createFacilityStaff(facility.facilityId, facilityUser.userId),
+      );
+
+      const master = {
+        medicalConditionId: 'medical-condition-insulin',
+        code: MedicalConditionCode.INSULIN,
+        name: 'インスリン',
+        displayOrder: 1,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as MedicalConditionMaster;
+
+      medicalConditionRepository.find.mockResolvedValue([master]);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+            note: '看護師が対応可能',
+          },
+        ],
+      };
+
+      const savedCapability = {
+        facilityId: facility.facilityId,
+        medicalConditionId: master.medicalConditionId,
+        status: FacilityMedicalCapabilityStatus.AVAILABLE,
+        note: '看護師が対応可能',
+      } as FacilityMedicalCapability;
+
+      facilityMedicalCapabilityRepository.create.mockReturnValue(
+        savedCapability,
+      );
+
+      facilityMedicalCapabilityRepository.save.mockResolvedValue([
+        savedCapability,
+      ]);
+
+      const result = await service.replaceMedicalCapabilities(
+        facility.facilityId,
+        dto,
+        facilityUser,
+      );
+
+      expect(facilityMedicalCapabilityRepository.delete).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+      });
+
+      expect(facilityMedicalCapabilityRepository.create).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+        medicalConditionId: master.medicalConditionId,
+        status: FacilityMedicalCapabilityStatus.AVAILABLE,
+        note: '看護師が対応可能',
+      });
+
+      expect(result).toEqual([savedCapability]);
+    });
+    it('医療対応情報の保存に失敗した場合はエラーを返す', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      const master = {
+        medicalConditionId: 'medical-condition-insulin',
+        code: MedicalConditionCode.INSULIN,
+        name: 'インスリン',
+        displayOrder: 1,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as MedicalConditionMaster;
+
+      medicalConditionRepository.find.mockResolvedValue([master]);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+          },
+        ],
+      };
+
+      const capability = {
+        facilityId: facility.facilityId,
+        medicalConditionId: master.medicalConditionId,
+        status: FacilityMedicalCapabilityStatus.AVAILABLE,
+        note: null,
+      } as FacilityMedicalCapability;
+
+      facilityMedicalCapabilityRepository.create.mockReturnValue(capability);
+
+      facilityMedicalCapabilityRepository.save.mockRejectedValue(
+        new Error('Database save failed'),
+      );
+
+      await expect(
+        service.replaceMedicalCapabilities(facility.facilityId, dto, adminUser),
+      ).rejects.toThrow('Database save failed');
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+
+      expect(facilityMedicalCapabilityRepository.delete).toHaveBeenCalledWith({
+        facilityId: facility.facilityId,
+      });
+
+      expect(facilityMedicalCapabilityRepository.save).toHaveBeenCalled();
+    });
+    it('FACILITYは非ACTIVE所属では医療対応情報を更新できない', async () => {
+      const facility = createFacility();
+
+      facilityRepository.findOne.mockResolvedValue(facility);
+
+      // 非ACTIVEの所属はACTIVE条件の検索では見つからない
+      facilityStaffRepository.findOne.mockResolvedValue(null);
+
+      const dto = {
+        capabilities: [
+          {
+            code: MedicalConditionCode.INSULIN,
+            status: FacilityMedicalCapabilityStatus.AVAILABLE,
+          },
+        ],
+      };
+
+      await expect(
+        service.replaceMedicalCapabilities(
+          facility.facilityId,
+          dto,
+          facilityUser,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      // ACTIVE所属のみを検索していることを確認
+      expect(facilityStaffRepository.findOne).toHaveBeenCalledWith({
+        where: {
+          userId: facilityUser.userId,
+          facilityId: facility.facilityId,
+          status: FacilityStaffStatus.ACTIVE,
+        },
+      });
+
+      // 権限がなければ更新処理は開始されない
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.delete).not.toHaveBeenCalled();
+      expect(facilityMedicalCapabilityRepository.save).not.toHaveBeenCalled();
     });
   });
 });
