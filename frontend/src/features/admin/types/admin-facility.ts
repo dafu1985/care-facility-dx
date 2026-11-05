@@ -12,6 +12,39 @@ export interface AdminFacilityType {
 }
 
 /**
+ * 空床状況。
+ */
+export interface AdminFacilityAvailability {
+  status: string;
+  availableCount: number | null;
+  availableFrom: string | null;
+  updatedAt: string;
+}
+
+/**
+ * 料金情報。
+ */
+export interface AdminFacilityPricing {
+  monthlyCostMin: number;
+  monthlyCostMax: number;
+  entranceFee: number;
+  note: string | null;
+}
+
+/**
+ * 受入条件・医療対応。
+ */
+export interface AdminFacilityRequirement {
+  minCareLevel: number | null;
+  maxCareLevel: number | null;
+  dementiaAccepted: boolean;
+  medicalCareAccepted: boolean;
+  wheelchairAccepted: boolean;
+  endOfLifeCare: boolean;
+  note: string | null;
+}
+
+/**
  * ADMIN施設一覧・詳細の施設情報。
  */
 export interface AdminFacility {
@@ -24,6 +57,10 @@ export interface AdminFacility {
   description: string | null;
   status: AdminFacilityStatus;
   facilityType: AdminFacilityType | null;
+
+  availability: AdminFacilityAvailability | null;
+  pricing: AdminFacilityPricing | null;
+  requirement: AdminFacilityRequirement | null;
 }
 
 /**

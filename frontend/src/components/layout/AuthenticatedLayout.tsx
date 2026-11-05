@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { Box } from "@mui/material";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import { InquiryUnreadNotifier } from "../../features/inquiries/components/InquiryUnreadNotifier";
 import { AppHeader } from "./AppHeader";
@@ -12,6 +13,16 @@ import { AppNavigation } from "./AppNavigation";
  * Outlet部分に各機能のページを表示する。
  */
 export function AuthenticatedLayout() {
+  const { pathname } = useLocation();
+
+  /**
+   * 画面遷移時にスクロール位置を先頭へ戻す。
+   * 同じパス内での状態変更では実行しない。
+   */
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
   return (
     <InquiryUnreadNotifier>
       {(unreadCount) => (
