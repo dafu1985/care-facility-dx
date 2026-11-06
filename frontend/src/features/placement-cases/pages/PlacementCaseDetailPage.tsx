@@ -1858,8 +1858,18 @@ export function PlacementCaseDetailPage() {
                               }}
                             >
                               <Chip
-                                label={`MATCH ${candidate.matchScore ?? 0}`}
-                                color="primary"
+                                label={`${
+                                  candidate.isCurrentMatch === true
+                                    ? "MATCH"
+                                    : candidate.isCurrentMatch === false
+                                      ? "前回スコア"
+                                      : "参考スコア"
+                                } ${candidate.matchScore ?? 0}`}
+                                color={
+                                  candidate.isCurrentMatch === true
+                                    ? "primary"
+                                    : "default"
+                                }
                                 sx={{
                                   fontWeight: 800,
                                 }}
