@@ -510,7 +510,12 @@ export class PlacementCasesService {
     );
 
     for (const candidate of unmatchedExistingCandidates) {
-      candidate.status = CandidateFacilityStatus.DECLINED;
+      // 検討中の候補だけを、マッチング対象外へ変更する。
+      // 問い合わせ中・見学予定・申込済み・受入決定などの
+      // 業務進捗ステータスは再マッチングで上書きしない。
+      if (candidate.status === CandidateFacilityStatus.CONSIDERING) {
+        candidate.status = CandidateFacilityStatus.DECLINED;
+      }
     }
 
     const candidatesToSave = [...candidates, ...unmatchedExistingCandidates];

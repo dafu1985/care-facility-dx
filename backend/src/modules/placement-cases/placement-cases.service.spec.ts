@@ -179,6 +179,69 @@ describe('PlacementCasesService matching', () => {
     ]);
   });
 
+  it('再マッチングで条件から外れても問い合わせ中のステータスを維持する', async () => {
+    const existingCandidate = {
+      ...candidate,
+      status: CandidateFacilityStatus.INQUIRING,
+    } as CandidateFacility;
+
+    candidateFacilityRepository.find.mockResolvedValue([existingCandidate]);
+
+    // マッチング対象となる施設が存在しない。
+    facilityRepository.find.mockResolvedValue([]);
+
+    candidateFacilityRepository.save.mockImplementation(
+      async (candidates) => candidates,
+    );
+
+    const result = await service.runMatching(placementCaseId, user);
+
+    expect(result).toHaveLength(0);
+
+    // 問い合わせ中の状態は再マッチングで変更しない。
+    expect(existingCandidate.status).toBe(CandidateFacilityStatus.INQUIRING);
+  });
+
+  it.each([
+    [CandidateFacilityStatus.CONSIDERING, CandidateFacilityStatus.DECLINED],
+    [CandidateFacilityStatus.INQUIRING, CandidateFacilityStatus.INQUIRING],
+    [CandidateFacilityStatus.AVAILABLE, CandidateFacilityStatus.AVAILABLE],
+    [
+      CandidateFacilityStatus.VISIT_SCHEDULED,
+      CandidateFacilityStatus.VISIT_SCHEDULED,
+    ],
+    [CandidateFacilityStatus.APPLIED, CandidateFacilityStatus.APPLIED],
+    [CandidateFacilityStatus.ACCEPTED, CandidateFacilityStatus.ACCEPTED],
+    [CandidateFacilityStatus.REJECTED, CandidateFacilityStatus.REJECTED],
+    [CandidateFacilityStatus.DECLINED, CandidateFacilityStatus.DECLINED],
+  ])(
+    '再マッチング対象外の候補ステータス %s は %s になる',
+    async (initialStatus, expectedStatus) => {
+      const existingCandidate = {
+        ...candidate,
+        status: initialStatus,
+      } as CandidateFacility;
+
+      candidateFacilityRepository.find.mockResolvedValue([existingCandidate]);
+
+      // マッチング対象となる施設が存在しない状態。
+      facilityRepository.find.mockResolvedValue([]);
+
+      candidateFacilityRepository.save.mockImplementation(
+        async (candidates) => candidates,
+      );
+
+      const result = await service.runMatching(placementCaseId, user);
+
+      expect(result).toHaveLength(0);
+      expect(existingCandidate.status).toBe(expectedStatus);
+
+      expect(candidateFacilityRepository.save).toHaveBeenCalledWith([
+        existingCandidate,
+      ]);
+    },
+  );
+
   describe('getCandidateFacilities active inquiry', () => {
     it.each([
       InquiryStatus.OPEN,
