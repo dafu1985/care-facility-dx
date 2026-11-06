@@ -1696,7 +1696,7 @@ export function PlacementCaseDetailPage() {
                     }}
                   >
                     <Typography variant="body2" color="text.secondary">
-                      マッチ度の高い順に表示しています。
+                      現在の条件に一致する施設を優先し、各グループ内ではマッチ度の高い順に表示しています。
                     </Typography>
 
                     <Chip
