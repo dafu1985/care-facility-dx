@@ -288,6 +288,37 @@ function getMedicalRequirementLevelColor(
 }
 
 /**
+ * 候補施設を現在のマッチング状態とスコアで並び替える。
+ *
+ * 優先順位：
+ * 1. 現在の条件に一致（true）
+ * 2. 評価状態が不明（null）
+ * 3. 現在の条件に不一致（false）
+ *
+ * 同じグループ内ではマッチスコアの高い順にする。
+ */
+const sortCandidateFacilities = (
+  candidates: CandidateFacility[],
+): CandidateFacility[] => {
+  const getMatchPriority = (isCurrentMatch: boolean | null): number => {
+    if (isCurrentMatch === true) return 0;
+    if (isCurrentMatch === null) return 1;
+    return 2;
+  };
+
+  return [...candidates].sort((a, b) => {
+    const priorityDifference =
+      getMatchPriority(a.isCurrentMatch) - getMatchPriority(b.isCurrentMatch);
+
+    if (priorityDifference !== 0) {
+      return priorityDifference;
+    }
+
+    return (b.matchScore ?? 0) - (a.matchScore ?? 0);
+  });
+};
+
+/**
  * 施設探し案件詳細画面。
  */
 export function PlacementCaseDetailPage() {
@@ -392,12 +423,11 @@ export function PlacementCaseDetailPage() {
           );
 
           /**
-           * 候補施設はマッチスコアの高い順に表示する。
+           * 候補施設は現在のマッチング状態を優先し、
+           * 同じグループ内ではマッチスコアの高い順に表示する。
            */
           setCandidateFacilities(
-            [...candidateFacilitiesResponse].sort(
-              (a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0),
-            ),
+            sortCandidateFacilities(candidateFacilitiesResponse),
           );
 
           setError(null);
@@ -448,17 +478,19 @@ export function PlacementCaseDetailPage() {
 
       const latestCandidates = await getCandidateFacilities(placementCaseId);
 
-      const sortedCandidates = [...latestCandidates].sort(
-        (a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0),
-      );
+      const sortedCandidates = sortCandidateFacilities(latestCandidates);
 
       setCandidateFacilities(sortedCandidates);
 
-      if (sortedCandidates.length === 0) {
+      const currentMatchCount = sortedCandidates.filter(
+        (candidate) => candidate.isCurrentMatch === true,
+      ).length;
+
+      if (currentMatchCount === 0) {
         setMatchingMessage("現在の条件に一致する候補施設はありませんでした。");
       } else {
         setMatchingMessage(
-          `${sortedCandidates.length}件の候補施設が見つかりました。`,
+          `${currentMatchCount}件の候補施設が現在の条件に一致しました。`,
         );
       }
     } catch (error) {
@@ -1577,7 +1609,13 @@ export function PlacementCaseDetailPage() {
               {/* マッチング結果メッセージ */}
               {matchingMessage && (
                 <Alert
-                  severity={candidateFacilities.length > 0 ? "success" : "info"}
+                  severity={
+                    candidateFacilities.some(
+                      (candidate) => candidate.isCurrentMatch === true,
+                    )
+                      ? "success"
+                      : "info"
+                  }
                 >
                   {matchingMessage}
                 </Alert>
@@ -1663,7 +1701,11 @@ export function PlacementCaseDetailPage() {
 
                     <Chip
                       size="small"
-                      label={`${candidateFacilities.length}件`}
+                      label={`現在一致 ${
+                        candidateFacilities.filter(
+                          (candidate) => candidate.isCurrentMatch === true,
+                        ).length
+                      }件 / 全${candidateFacilities.length}件`}
                       color="primary"
                       variant="outlined"
                       sx={{
@@ -1680,7 +1722,14 @@ export function PlacementCaseDetailPage() {
                         position: "relative",
                         overflow: "hidden",
                         borderRadius: 3,
-                        borderColor: index === 0 ? "primary.main" : "divider",
+
+                        borderColor:
+                          index === 0 &&
+                          candidate.isCurrentMatch === true &&
+                          candidate.status !== "DECLINED"
+                            ? "primary.main"
+                            : "divider",
+
                         transition:
                           "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
                         "&:hover": {
@@ -1690,26 +1739,29 @@ export function PlacementCaseDetailPage() {
                         },
                       }}
                     >
-                      {/* 1位候補 */}
-                      {index === 0 && (
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            px: 1.5,
-                            py: 0.5,
-                            bgcolor: "primary.main",
-                            color: "primary.contrastText",
-                            borderBottomRightRadius: 12,
-                            fontSize: "0.7rem",
-                            fontWeight: 800,
-                            letterSpacing: "0.05em",
-                          }}
-                        >
-                          TOP MATCH
-                        </Box>
-                      )}
+                      {/* 現在の条件に一致する先頭候補のみTOP MATCHを表示する */}
+                      {index === 0 &&
+                        candidate.isCurrentMatch === true &&
+                        candidate.status !== "DECLINED" && (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              top: 8,
+                              left: 8,
+                              px: 1.5,
+                              py: 0.5,
+                              bgcolor: "primary.main",
+
+                              color: "primary.contrastText",
+                              borderBottomRightRadius: 12,
+                              fontSize: "0.7rem",
+                              fontWeight: 800,
+                              letterSpacing: "0.05em",
+                            }}
+                          >
+                            TOP MATCH
+                          </Box>
+                        )}
 
                       <CardContent
                         sx={{
@@ -1717,8 +1769,9 @@ export function PlacementCaseDetailPage() {
                             xs: 2.5,
                             md: 3,
                           },
+
                           pt:
-                            index === 0
+                            index === 0 && candidate.status !== "DECLINED"
                               ? {
                                   xs: 5,
                                   md: 5,
@@ -1809,6 +1862,27 @@ export function PlacementCaseDetailPage() {
                                 color="primary"
                                 sx={{
                                   fontWeight: 800,
+                                }}
+                              />
+
+                              <Chip
+                                label={
+                                  candidate.isCurrentMatch === true
+                                    ? "現在の条件に一致"
+                                    : candidate.isCurrentMatch === false
+                                      ? "現在の条件から外れています"
+                                      : "マッチング状態が未確認"
+                                }
+                                color={
+                                  candidate.isCurrentMatch === true
+                                    ? "success"
+                                    : candidate.isCurrentMatch === false
+                                      ? "warning"
+                                      : "default"
+                                }
+                                variant="outlined"
+                                sx={{
+                                  fontWeight: 700,
                                 }}
                               />
 

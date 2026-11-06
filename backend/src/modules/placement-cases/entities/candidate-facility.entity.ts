@@ -76,6 +76,21 @@ export class CandidateFacility {
   matchScore: number | null;
 
   /**
+   * 直近のマッチング結果。
+   *
+   * true: 条件に一致
+   * false: 条件に不一致
+   * null: 評価状態が不明（既存データなど）
+   */
+  @Column({
+    name: 'is_current_match',
+    type: 'boolean',
+    nullable: true,
+    default: null,
+  })
+  isCurrentMatch: boolean | null;
+
+  /**
    * 候補施設としての進捗状態。
    */
   @Column({

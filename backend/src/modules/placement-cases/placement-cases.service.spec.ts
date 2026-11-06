@@ -144,6 +144,43 @@ describe('PlacementCasesService matching', () => {
     facilityMedicalCapabilityRepository.find.mockResolvedValue([]);
   });
 
+  it('新規候補施設は現在のマッチング条件に一致した状態で作成される', async () => {
+    // 既存候補は存在しない。
+    candidateFacilityRepository.find.mockResolvedValue([]);
+
+    // Repository.create() の戻り値を再現する。
+    candidateFacilityRepository.create.mockImplementation((data) => data);
+
+    candidateFacilityRepository.save.mockImplementation(
+      async (candidates) => candidates,
+    );
+
+    const result = await service.runMatching(placementCaseId, user);
+
+    expect(result).toHaveLength(1);
+
+    // 新規候補が正しい値で作成されることを確認する。
+    expect(candidateFacilityRepository.create).toHaveBeenCalledWith({
+      placementCaseId,
+      facilityId,
+      matchScore: 0,
+      isCurrentMatch: true,
+      status: CandidateFacilityStatus.CONSIDERING,
+      note: null,
+    });
+
+    expect(result[0].isCurrentMatch).toBe(true);
+    expect(result[0].status).toBe(CandidateFacilityStatus.CONSIDERING);
+
+    // 作成した候補が保存処理へ渡されることを確認する。
+    expect(candidateFacilityRepository.save).toHaveBeenCalledWith([
+      expect.objectContaining({
+        facilityId,
+        isCurrentMatch: true,
+      }),
+    ]);
+  });
+
   it('再マッチング時に既存候補のID・ステータス・メモを維持する', async () => {
     const existingCandidate = {
       candidateFacilityId,
@@ -170,6 +207,8 @@ describe('PlacementCasesService matching', () => {
 
     // 条件なしの場合は各スコアが0になるため、最新値の0へ更新される。
     expect(result[0].matchScore).toBe(0);
+
+    expect(result[0].isCurrentMatch).toBe(true);
 
     // 既存候補を再利用するため、新しいCandidateFacilityは作成しない。
     expect(candidateFacilityRepository.create).not.toHaveBeenCalled();
@@ -235,6 +274,7 @@ describe('PlacementCasesService matching', () => {
 
       expect(result).toHaveLength(0);
       expect(existingCandidate.status).toBe(expectedStatus);
+      expect(existingCandidate.isCurrentMatch).toBe(false);
 
       expect(candidateFacilityRepository.save).toHaveBeenCalledWith([
         existingCandidate,

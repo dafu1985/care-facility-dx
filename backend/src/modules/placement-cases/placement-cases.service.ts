@@ -473,10 +473,11 @@ export class PlacementCasesService {
 
       if (existingCandidate) {
         /**
-         * 既存候補はID・ステータス・メモを維持し、
-         * マッチスコアだけ最新値へ更新する。
+         * 既存候補のID・業務ステータス・メモは維持する。
+         * マッチスコアと最新のマッチング状態のみ更新する。
          */
         existingCandidate.matchScore = matchScore;
+        existingCandidate.isCurrentMatch = true;
 
         candidates.push(existingCandidate);
 
@@ -487,6 +488,7 @@ export class PlacementCasesService {
         placementCaseId,
         facilityId: facility.facilityId,
         matchScore,
+        isCurrentMatch: true,
         status: CandidateFacilityStatus.CONSIDERING,
         note: null,
       });
@@ -510,7 +512,10 @@ export class PlacementCasesService {
     );
 
     for (const candidate of unmatchedExistingCandidates) {
-      // 検討中の候補だけを、マッチング対象外へ変更する。
+      // 今回のマッチング条件から外れたことを記録する。
+      candidate.isCurrentMatch = false;
+
+      // 検討中の候補だけをDECLINEDへ変更する。
       // 問い合わせ中・見学予定・申込済み・受入決定などの
       // 業務進捗ステータスは再マッチングで上書きしない。
       if (candidate.status === CandidateFacilityStatus.CONSIDERING) {

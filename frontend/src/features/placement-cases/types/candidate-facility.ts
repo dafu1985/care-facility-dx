@@ -36,6 +36,7 @@ export interface CandidateFacility {
   placementCaseId: string;
   facilityId: string;
   matchScore: number | null;
+  isCurrentMatch: boolean | null;
   status: CandidateFacilityStatus;
   note: string | null;
   createdAt: string;
