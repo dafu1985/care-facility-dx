@@ -5,7 +5,7 @@
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager, In, QueryFailedError } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
 import {
@@ -88,156 +88,178 @@ export class InquiriesService {
       throw new ForbiddenException('You are not allowed to create inquiries');
     }
 
-    const savedInquiry = await this.dataSource.transaction(async (manager) => {
-      const inquiryRepository = manager.getRepository(Inquiry);
-      const messageRepository = manager.getRepository(InquiryMessage);
+    let savedInquiry: Inquiry;
 
-      // 案件・候補施設が指定された場合、検証後のEntityを保持する。
-      // Inquiry作成後のステータス連動更新で使用する。
-      let placementCase: PlacementCase | null = null;
-      let candidateFacility: CandidateFacility | null = null;
+    try {
+      savedInquiry = await this.dataSource.transaction(async (manager) => {
+        const inquiryRepository = manager.getRepository(Inquiry);
+        const messageRepository = manager.getRepository(InquiryMessage);
 
-      /**
-       * 案件IDが指定されている場合は、
-       * 案件の存在確認と所有者確認を行う。
-       */
-      if (dto.placementCaseId) {
-        const placementCaseRepository = manager.getRepository(PlacementCase);
+        // 案件・候補施設が指定された場合、検証後のEntityを保持する。
+        // Inquiry作成後のステータス連動更新で使用する。
+        let placementCase: PlacementCase | null = null;
+        let candidateFacility: CandidateFacility | null = null;
 
-        placementCase = await placementCaseRepository.findOne({
-          where: {
-            placementCaseId: dto.placementCaseId,
-          },
+        /**
+         * 案件IDが指定されている場合は、
+         * 案件の存在確認と所有者確認を行う。
+         */
+        if (dto.placementCaseId) {
+          const placementCaseRepository = manager.getRepository(PlacementCase);
+
+          placementCase = await placementCaseRepository.findOne({
+            where: {
+              placementCaseId: dto.placementCaseId,
+            },
+          });
+
+          if (!placementCase) {
+            throw new NotFoundException('Placement case not found');
+          }
+
+          if (
+            user.role === UserRole.CARE_MANAGER &&
+            placementCase.careManagerId !== user.userId
+          ) {
+            throw new ForbiddenException(
+              'You do not have permission to use this placement case',
+            );
+          }
+        }
+
+        /**
+         * candidateFacilityId を指定する場合は
+         * placementCaseId も必須。
+         */
+        if (dto.candidateFacilityId && !dto.placementCaseId) {
+          throw new BadRequestException(
+            'placementCaseId is required when candidateFacilityId is specified',
+          );
+        }
+
+        /**
+         * 候補施設が指定された案件と施設に
+         * 正しく紐付いているか確認する。
+         */
+        if (dto.candidateFacilityId) {
+          const candidateFacilityRepository =
+            manager.getRepository(CandidateFacility);
+
+          candidateFacility = await candidateFacilityRepository.findOne({
+            where: {
+              candidateFacilityId: dto.candidateFacilityId,
+            },
+          });
+
+          if (!candidateFacility) {
+            throw new NotFoundException('Candidate facility not found');
+          }
+
+          if (candidateFacility.placementCaseId !== dto.placementCaseId) {
+            throw new BadRequestException(
+              'Candidate facility does not belong to the specified placement case',
+            );
+          }
+
+          if (candidateFacility.facilityId !== dto.facilityId) {
+            throw new BadRequestException(
+              'Candidate facility does not match the specified facility',
+            );
+          }
+        }
+
+        /**
+         * 同じ候補施設に対して進行中の問い合わせが既に存在する場合は、
+         * 重複して新しいInquiryを作成しない。
+         */
+        if (dto.candidateFacilityId) {
+          const existingInquiry = await inquiryRepository.findOne({
+            where: {
+              candidateFacilityId: dto.candidateFacilityId,
+              status: In([
+                InquiryStatus.OPEN,
+                InquiryStatus.IN_PROGRESS,
+                InquiryStatus.ANSWERED,
+              ]),
+            },
+          });
+
+          if (existingInquiry) {
+            throw new ConflictException(
+              'An active inquiry already exists for this candidate facility',
+            );
+          }
+        }
+
+        const now = new Date();
+
+        const inquiry = inquiryRepository.create({
+          facilityId: dto.facilityId,
+          createdByUserId: user.userId,
+          placementCaseId: dto.placementCaseId ?? null,
+          candidateFacilityId: dto.candidateFacilityId ?? null,
+          subject: dto.subject,
+          status: InquiryStatus.OPEN,
+          lastMessageAt: now,
         });
 
-        if (!placementCase) {
-          throw new NotFoundException('Placement case not found');
+        const saved = await inquiryRepository.save(inquiry);
+
+        const message = messageRepository.create({
+          inquiryId: saved.inquiryId,
+          senderUserId: user.userId,
+          type: InquiryMessageType.MESSAGE,
+          body: dto.body,
+        });
+
+        await messageRepository.save(message);
+
+        /**
+         * 候補施設経由の問い合わせの場合、
+         * 候補施設ステータスを INQUIRING に更新する。
+         */
+        if (candidateFacility) {
+          const candidateFacilityRepository =
+            manager.getRepository(CandidateFacility);
+
+          candidateFacility.status = CandidateFacilityStatus.INQUIRING;
+
+          await candidateFacilityRepository.save(candidateFacility);
         }
+
+        /**
+         * 案件に紐づく問い合わせの場合、
+         * 案件ステータスを INQUIRING に更新する。
+         */
+        if (placementCase) {
+          const placementCaseRepository = manager.getRepository(PlacementCase);
+
+          placementCase.status = PlacementCaseStatus.INQUIRING;
+
+          await placementCaseRepository.save(placementCase);
+        }
+
+        return saved;
+      });
+    } catch (error: unknown) {
+      if (error instanceof QueryFailedError) {
+        const driverError = error.driverError as {
+          code?: string;
+          constraint?: string;
+        };
 
         if (
-          user.role === UserRole.CARE_MANAGER &&
-          placementCase.careManagerId !== user.userId
+          driverError.code === '23505' &&
+          driverError.constraint === 'UQ_inquiry_active_candidate_facility'
         ) {
-          throw new ForbiddenException(
-            'You do not have permission to use this placement case',
-          );
-        }
-      }
-
-      /**
-       * candidateFacilityId を指定する場合は
-       * placementCaseId も必須。
-       */
-      if (dto.candidateFacilityId && !dto.placementCaseId) {
-        throw new BadRequestException(
-          'placementCaseId is required when candidateFacilityId is specified',
-        );
-      }
-
-      /**
-       * 候補施設が指定された案件と施設に
-       * 正しく紐付いているか確認する。
-       */
-      if (dto.candidateFacilityId) {
-        const candidateFacilityRepository =
-          manager.getRepository(CandidateFacility);
-
-        candidateFacility = await candidateFacilityRepository.findOne({
-          where: {
-            candidateFacilityId: dto.candidateFacilityId,
-          },
-        });
-
-        if (!candidateFacility) {
-          throw new NotFoundException('Candidate facility not found');
-        }
-
-        if (candidateFacility.placementCaseId !== dto.placementCaseId) {
-          throw new BadRequestException(
-            'Candidate facility does not belong to the specified placement case',
-          );
-        }
-
-        if (candidateFacility.facilityId !== dto.facilityId) {
-          throw new BadRequestException(
-            'Candidate facility does not match the specified facility',
-          );
-        }
-      }
-
-      /**
-       * 同じ候補施設に対して進行中の問い合わせが既に存在する場合は、
-       * 重複して新しいInquiryを作成しない。
-       */
-      if (dto.candidateFacilityId) {
-        const existingInquiry = await inquiryRepository.findOne({
-          where: {
-            candidateFacilityId: dto.candidateFacilityId,
-            status: In([
-              InquiryStatus.OPEN,
-              InquiryStatus.IN_PROGRESS,
-              InquiryStatus.ANSWERED,
-            ]),
-          },
-        });
-
-        if (existingInquiry) {
           throw new ConflictException(
             'An active inquiry already exists for this candidate facility',
           );
         }
       }
 
-      const now = new Date();
-
-      const inquiry = inquiryRepository.create({
-        facilityId: dto.facilityId,
-        createdByUserId: user.userId,
-        placementCaseId: dto.placementCaseId ?? null,
-        candidateFacilityId: dto.candidateFacilityId ?? null,
-        subject: dto.subject,
-        status: InquiryStatus.OPEN,
-        lastMessageAt: now,
-      });
-
-      const saved = await inquiryRepository.save(inquiry);
-
-      const message = messageRepository.create({
-        inquiryId: saved.inquiryId,
-        senderUserId: user.userId,
-        type: InquiryMessageType.MESSAGE,
-        body: dto.body,
-      });
-
-      await messageRepository.save(message);
-
-      /**
-       * 候補施設経由の問い合わせの場合、
-       * 候補施設ステータスを INQUIRING に更新する。
-       */
-      if (candidateFacility) {
-        const candidateFacilityRepository =
-          manager.getRepository(CandidateFacility);
-
-        candidateFacility.status = CandidateFacilityStatus.INQUIRING;
-
-        await candidateFacilityRepository.save(candidateFacility);
-      }
-
-      /**
-       * 案件に紐づく問い合わせの場合、
-       * 案件ステータスを INQUIRING に更新する。
-       */
-      if (placementCase) {
-        const placementCaseRepository = manager.getRepository(PlacementCase);
-
-        placementCase.status = PlacementCaseStatus.INQUIRING;
-
-        await placementCaseRepository.save(placementCase);
-      }
-
-      return saved;
-    });
+      throw error;
+    }
 
     return InquiryMapper.toCreateResponse(savedInquiry);
   }

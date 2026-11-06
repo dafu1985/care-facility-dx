@@ -10,6 +10,7 @@ import {
   FindManyOptions,
   FindOneOptions,
   In,
+  QueryFailedError,
 } from 'typeorm';
 
 import type { AuthenticatedUser } from '../auth/jwt.strategy';
@@ -648,6 +649,65 @@ describe('InquiriesService authorization', () => {
       expect(inquiryMessageRepository.save).toHaveBeenCalled();
       expect(candidateFacilityRepository.save).toHaveBeenCalled();
       expect(placementCaseRepository.save).toHaveBeenCalled();
+    });
+    it('DBの重複制約違反23505を409 Conflictに変換する', async () => {
+      const dbError = Object.assign(
+        new Error('duplicate key value violates unique constraint'),
+        {
+          code: '23505',
+          constraint: 'UQ_inquiry_active_candidate_facility',
+        },
+      );
+
+      const queryError = new QueryFailedError(
+        'INSERT INTO inquiry ...',
+        [],
+        dbError,
+      );
+
+      jest.spyOn(dataSource, 'transaction').mockRejectedValueOnce(queryError);
+
+      await expect(
+        service.create(createDto, careManagerUser),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+    it('別のユニーク制約違反23505は元のエラーを維持する', async () => {
+      const dbError = Object.assign(
+        new Error('duplicate key value violates unique constraint'),
+        {
+          code: '23505',
+          constraint: 'UQ_other_constraint',
+        },
+      );
+
+      const queryError = new QueryFailedError(
+        'INSERT INTO inquiry ...',
+        [],
+        dbError,
+      );
+
+      jest.spyOn(dataSource, 'transaction').mockRejectedValueOnce(queryError);
+
+      await expect(service.create(createDto, careManagerUser)).rejects.toBe(
+        queryError,
+      );
+    });
+    it('通常のDBエラーは元のエラーを維持する', async () => {
+      const dbError = Object.assign(new Error('database connection failure'), {
+        code: '08006',
+      });
+
+      const queryError = new QueryFailedError(
+        'INSERT INTO inquiry ...',
+        [],
+        dbError,
+      );
+
+      jest.spyOn(dataSource, 'transaction').mockRejectedValueOnce(queryError);
+
+      await expect(service.create(createDto, careManagerUser)).rejects.toBe(
+        queryError,
+      );
     });
   });
 
