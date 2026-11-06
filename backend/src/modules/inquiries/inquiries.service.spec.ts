@@ -1307,6 +1307,13 @@ describe('InquiriesService authorization', () => {
         );
 
         expect(result.status).toBe(InquiryStatus.CANCELLED);
+
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith({
+          inquiryId: inquiryBeforeUpdate.inquiryId,
+          senderUserId: null,
+          type: InquiryMessageType.STATUS_CHANGE,
+          body: '対応状況を「未対応」から「キャンセル」に変更しました。',
+        });
       });
 
       it('IN_PROGRESS → CANCELLED は許可される', async () => {

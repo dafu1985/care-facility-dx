@@ -59,6 +59,9 @@ function getInquiryStatusLabel(status: InquiryStatus): string {
     case InquiryStatus.CLOSED:
       return '完了';
 
+    case InquiryStatus.CANCELLED:
+      return 'キャンセル';
+
     default:
       return status;
   }
