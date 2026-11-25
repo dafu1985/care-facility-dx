@@ -26,6 +26,7 @@ import { InquiryMessageForm } from "../components/InquiryMessageForm";
 import { InquiryStatusForm } from "../components/InquiryStatusForm";
 
 import type { Inquiry, InquiryStatus } from "../types/inquiry";
+import { getInquiryStatusUpdateErrorMessage } from "../utils/inquiry-status-update-error";
 
 /**
  * 問い合わせ詳細画面。
@@ -220,7 +221,9 @@ export function InquiryDetailPage() {
       await updateInquiryStatus(inquiryId, { status });
     } catch (error) {
       console.error("ステータス更新に失敗しました。", error);
-      setError("ステータス更新に失敗しました。");
+
+      setError(getInquiryStatusUpdateErrorMessage(error));
+
       setIsUpdatingStatus(false);
       return;
     }
