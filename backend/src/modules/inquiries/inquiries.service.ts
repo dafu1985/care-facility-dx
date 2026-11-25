@@ -23,7 +23,10 @@ import {
 } from '../placement-cases/entities/placement-case.entity';
 
 import { CreateInquiryDto } from './dto/create-inquiry.dto';
-import { CreateInquiryMessageDto } from './dto/create-inquiry-message.dto';
+import {
+  CreateInquiryMessageDto,
+  INQUIRY_MESSAGE_MAX_LENGTH,
+} from './dto/create-inquiry-message.dto';
 import { InquirySearchDto } from './dto/inquiry-search.dto';
 import { MarkInquiryReadDto } from './dto/mark-inquiry-read.dto';
 import { UpdateInquiryStatusDto } from './dto/update-inquiry-status.dto';
@@ -65,6 +68,32 @@ function getInquiryStatusLabel(status: InquiryStatus): string {
     default:
       return status;
   }
+}
+
+/**
+ * 問い合わせメッセージ本文を正規化・検証する。
+ *
+ * DTOバリデーションを経由しないServiceの
+ * 直接呼び出しに対しても入力制御を保証する。
+ */
+function normalizeInquiryMessageBody(body: unknown): string {
+  if (typeof body !== 'string') {
+    throw new BadRequestException('Message body must be a string');
+  }
+
+  const normalizedBody = body.trim();
+
+  if (normalizedBody.length === 0) {
+    throw new BadRequestException('Message body must not be empty');
+  }
+
+  if (Array.from(normalizedBody).length > INQUIRY_MESSAGE_MAX_LENGTH) {
+    throw new BadRequestException(
+      `Message body must not exceed ${INQUIRY_MESSAGE_MAX_LENGTH} characters`,
+    );
+  }
+
+  return normalizedBody;
 }
 
 @Injectable()
@@ -403,15 +432,17 @@ export class InquiriesService {
     dto: CreateInquiryMessageDto,
     user: AuthenticatedUser,
   ): Promise<InquiryMessageResponseDto> {
+    /**
+     * メッセージ本文の正規化・検証。
+     */
+    const body = normalizeInquiryMessageBody(dto.body);
+
     const savedMessage = await this.dataSource.transaction(async (manager) => {
       const inquiryRepository = manager.getRepository(Inquiry);
-
       const messageRepository = manager.getRepository(InquiryMessage);
 
       const inquiry = await inquiryRepository.findOne({
-        where: {
-          inquiryId,
-        },
+        where: { inquiryId },
       });
 
       if (!inquiry) {
@@ -424,7 +455,7 @@ export class InquiriesService {
         inquiryId,
         senderUserId: user.userId,
         type: InquiryMessageType.MESSAGE,
-        body: dto.body,
+        body,
       });
 
       const saved = await messageRepository.save(message);

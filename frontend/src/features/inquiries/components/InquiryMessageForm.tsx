@@ -1,5 +1,12 @@
 import { Box, Button, Stack, TextField } from "@mui/material";
 
+import {
+  INQUIRY_MESSAGE_MAX_LENGTH,
+  getInquiryMessageLength,
+  isInquiryMessageTooLong,
+  isInquiryMessageValid,
+} from "../utils/inquiry-message";
+
 type InquiryMessageFormProps = {
   messageBody: string;
   onMessageBodyChange: (value: string) => void;
@@ -10,7 +17,9 @@ type InquiryMessageFormProps = {
 /**
  * 問い合わせ返信フォーム。
  *
- * 入力欄と送信ボタンの表示を担当する。
+ * メッセージ本文の入力、文字数表示、
+ * 入力制御および送信ボタンの表示を担当する。
+ *
  * API通信や送信後の状態更新は親画面で行う。
  */
 export function InquiryMessageForm({
@@ -19,6 +28,12 @@ export function InquiryMessageForm({
   onSendMessage,
   isSending,
 }: InquiryMessageFormProps) {
+  const messageLength = getInquiryMessageLength(messageBody);
+
+  const isTooLong = isInquiryMessageTooLong(messageBody);
+
+  const isMessageValid = isInquiryMessageValid(messageBody);
+
   return (
     <Stack spacing={2.5}>
       <TextField
@@ -29,6 +44,38 @@ export function InquiryMessageForm({
         multiline
         minRows={4}
         fullWidth
+        disabled={isSending}
+        error={isTooLong}
+        helperText={
+          <Box
+            component="span"
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+            }}
+          >
+            <Box component="span">
+              {isTooLong
+                ? "メッセージは2,000文字以内で入力してください。"
+                : "最大2,000文字まで入力できます。"}
+            </Box>
+
+            <Box
+              component="span"
+              sx={{
+                ml: "auto",
+                fontWeight: isTooLong ? 700 : 400,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {messageLength.toLocaleString("ja-JP")} /{" "}
+              {INQUIRY_MESSAGE_MAX_LENGTH.toLocaleString("ja-JP")}
+            </Box>
+          </Box>
+        }
         sx={{
           "& .MuiOutlinedInput-root": {
             borderRadius: 2.5,
@@ -38,16 +85,11 @@ export function InquiryMessageForm({
         }}
       />
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-end",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
         <Button
           variant="contained"
           onClick={onSendMessage}
-          disabled={isSending || messageBody.trim() === ""}
+          disabled={isSending || !isMessageValid}
           sx={{
             minWidth: { xs: "100%", sm: 180 },
             minHeight: 44,

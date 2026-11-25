@@ -27,6 +27,13 @@ import { InquiryStatusForm } from "../components/InquiryStatusForm";
 
 import type { Inquiry, InquiryStatus } from "../types/inquiry";
 import { getInquiryStatusUpdateErrorMessage } from "../utils/inquiry-status-update-error";
+import { getInquiryMessageSendErrorMessage } from "../utils/inquiry-message-send-error";
+
+import {
+  INQUIRY_MESSAGE_MAX_LENGTH,
+  normalizeInquiryMessageBody,
+  isInquiryMessageTooLong,
+} from "../utils/inquiry-message";
 
 /**
  * 問い合わせ詳細画面。
@@ -58,7 +65,20 @@ export function InquiryDetailPage() {
 
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
+  /**
+   * 問い合わせ詳細の取得エラー。
+   */
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * ステータス更新時のエラー。
+   */
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  /**
+   * メッセージ送信時のエラー。
+   */
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   /**
    * 問い合わせ再取得のリクエスト番号。
@@ -169,21 +189,30 @@ export function InquiryDetailPage() {
       return;
     }
 
-    const body = messageBody.trim();
+    const body = normalizeInquiryMessageBody(messageBody);
 
     if (body === "") {
-      setError("メッセージを入力してください。");
+      setMessageError("メッセージを入力してください。");
+      return;
+    }
+
+    if (isInquiryMessageTooLong(body)) {
+      setMessageError(
+        `メッセージは${INQUIRY_MESSAGE_MAX_LENGTH.toLocaleString("ja-JP")}文字以内で入力してください。`,
+      );
       return;
     }
 
     setIsSending(true);
-    setError(null);
+    setMessageError(null);
 
     try {
       await addInquiryMessage(inquiryId, { body });
     } catch (error) {
       console.error("メッセージ送信に失敗しました。", error);
-      setError("メッセージ送信に失敗しました。");
+
+      setMessageError(getInquiryMessageSendErrorMessage(error));
+
       setIsSending(false);
       return;
     }
@@ -194,14 +223,14 @@ export function InquiryDetailPage() {
       await refreshInquiry(inquiryId);
     } catch (error) {
       console.error("送信後の再取得に失敗しました。", error);
-      setError(
+
+      setMessageError(
         "メッセージは送信されましたが、履歴の更新に失敗しました。画面を再読み込みしてください。",
       );
     } finally {
       setIsSending(false);
     }
   };
-
   /**
    * ステータス更新。
    */
@@ -215,14 +244,14 @@ export function InquiryDetailPage() {
     }
 
     setIsUpdatingStatus(true);
-    setError(null);
+    setStatusError(null);
 
     try {
       await updateInquiryStatus(inquiryId, { status });
     } catch (error) {
       console.error("ステータス更新に失敗しました。", error);
 
-      setError(getInquiryStatusUpdateErrorMessage(error));
+      setStatusError(getInquiryStatusUpdateErrorMessage(error));
 
       setIsUpdatingStatus(false);
       return;
@@ -234,7 +263,8 @@ export function InquiryDetailPage() {
       await refreshInquiry(inquiryId);
     } catch (error) {
       console.error("更新後の再取得に失敗しました。", error);
-      setError(
+
+      setStatusError(
         "ステータスは更新されましたが、最新情報の取得に失敗しました。画面を再読み込みしてください。",
       );
     } finally {
@@ -419,6 +449,16 @@ export function InquiryDetailPage() {
                   bgcolor: "#F8FAFC",
                 }}
               >
+                {statusError && (
+                  <Alert
+                    severity="error"
+                    sx={{ mb: 2 }}
+                    onClose={() => setStatusError(null)}
+                  >
+                    {statusError}
+                  </Alert>
+                )}
+
                 {currentUser !== null && (
                   <InquiryStatusForm
                     status={status}
@@ -544,6 +584,16 @@ export function InquiryDetailPage() {
                   問い合わせ相手にメッセージを送信できます。
                 </Typography>
               </Box>
+
+              {messageError && (
+                <Alert
+                  severity="error"
+                  sx={{ mb: 2 }}
+                  onClose={() => setMessageError(null)}
+                >
+                  {messageError}
+                </Alert>
+              )}
 
               <InquiryMessageForm
                 messageBody={messageBody}

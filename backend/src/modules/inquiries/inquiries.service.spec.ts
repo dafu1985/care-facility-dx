@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   DataSource,
@@ -31,6 +32,8 @@ import {
   InquiryMessageType,
 } from './entities/inquiry-message.entity';
 import { InquiryReadStatus } from './entities/inquiry-read-status.entity';
+
+import { INQUIRY_MESSAGE_MAX_LENGTH } from './dto/create-inquiry-message.dto';
 
 /**
  * QueryBuilderの必要部分だけを持つテスト用型。
@@ -994,6 +997,153 @@ describe('InquiriesService authorization', () => {
 
       return savedMessage;
     };
+
+    /**
+     * メッセージ本文の入力制御。
+     */
+    describe('message body validation', () => {
+      it('空文字のメッセージを拒否する', async () => {
+        await expect(
+          service.addMessage(
+            ownInquiry.inquiryId,
+            { body: '' },
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('空白のみのメッセージを拒否する', async () => {
+        await expect(
+          service.addMessage(
+            ownInquiry.inquiryId,
+            { body: '   ' },
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('改行やタブのみのメッセージを拒否する', async () => {
+        await expect(
+          service.addMessage(
+            ownInquiry.inquiryId,
+            { body: '\n\t\r\n' },
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('文字列以外のメッセージを拒否する', async () => {
+        await expect(
+          service.addMessage(
+            ownInquiry.inquiryId,
+            { body: 12345 as unknown as string },
+            careManagerUser,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('前後の空白を除去してメッセージを保存する', async () => {
+        setupAddMessageSuccess(careManagerUser.userId);
+
+        await service.addMessage(
+          ownInquiry.inquiryId,
+          { body: '  施設側からの返信テストです。  ' },
+          careManagerUser,
+        );
+
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith({
+          inquiryId: ownInquiry.inquiryId,
+          senderUserId: careManagerUser.userId,
+          type: InquiryMessageType.MESSAGE,
+          body: '施設側からの返信テストです。',
+        });
+      });
+
+      it('最大文字数ちょうどのメッセージを許可する', async () => {
+        setupAddMessageSuccess(careManagerUser.userId);
+
+        const body = 'あ'.repeat(INQUIRY_MESSAGE_MAX_LENGTH);
+
+        await service.addMessage(
+          ownInquiry.inquiryId,
+          { body },
+          careManagerUser,
+        );
+
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ body }),
+        );
+
+        expect(inquiryMessageRepository.save).toHaveBeenCalled();
+      });
+
+      it('最大文字数を超えるメッセージを拒否する', async () => {
+        const body = 'あ'.repeat(INQUIRY_MESSAGE_MAX_LENGTH + 1);
+
+        await expect(
+          service.addMessage(ownInquiry.inquiryId, { body }, careManagerUser),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.create).not.toHaveBeenCalled();
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+        expect(inquiryRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('絵文字をUnicodeコードポイント単位で判定する', async () => {
+        setupAddMessageSuccess(careManagerUser.userId);
+
+        const body = '😀'.repeat(INQUIRY_MESSAGE_MAX_LENGTH);
+
+        await service.addMessage(
+          ownInquiry.inquiryId,
+          { body },
+          careManagerUser,
+        );
+
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ body }),
+        );
+
+        expect(inquiryMessageRepository.save).toHaveBeenCalled();
+      });
+
+      it('絵文字でも最大文字数を超える場合は拒否する', async () => {
+        const body = '😀'.repeat(INQUIRY_MESSAGE_MAX_LENGTH + 1);
+
+        await expect(
+          service.addMessage(ownInquiry.inquiryId, { body }, careManagerUser),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        expect(inquiryMessageRepository.save).not.toHaveBeenCalled();
+      });
+
+      it('本文途中の改行を維持する', async () => {
+        setupAddMessageSuccess(careManagerUser.userId);
+
+        const body = '現在2床空いています。\n来週の見学も可能です。';
+
+        await service.addMessage(
+          ownInquiry.inquiryId,
+          { body },
+          careManagerUser,
+        );
+
+        expect(inquiryMessageRepository.create).toHaveBeenCalledWith(
+          expect.objectContaining({ body }),
+        );
+      });
+    });
 
     it('CARE_MANAGERは自分の問い合わせへ返信できる', async () => {
       const savedMessage = setupAddMessageSuccess(careManagerUser.userId);
